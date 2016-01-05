@@ -15,7 +15,7 @@ def generateLena(Nr=512, Nc=512):
     Nr, Nc = min(Nr, 512), min(Nc, 512)
     l = scipy.misc.lena().astype(np.float32)
     l = l[:Nr, :Nc]
-    binary_write(l, "lena.dat")
+    binary_write(l, "lena2.dat", fmt="f")
 
 
 if __name__ == '__main__':

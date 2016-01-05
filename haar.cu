@@ -2,13 +2,6 @@
 #define HAAR_AVG(a, b) ((a+b))
 #define HAAR_DIF(a, b) ((a-b))
 
-void w_swap_ptr(float** a, float** b) {
-    float* tmp = *a;
-    *a = *b;
-    *b = tmp;
-}
-
-
 
 // must be run with grid size = (Nc/2, Nr/2)  where Nr = numrows of input
 __global__ void kern_haar2d_fwd(float* img, float* c_a, float* c_h, float* c_v, float* c_d, int Nr, int Nc) {

@@ -1,3 +1,6 @@
+#include "filters.h"
+#include "common.h"
+
 #define MAX_FILTER_WIDTH 40
 
 #  define CUDACHECK \
@@ -18,28 +21,12 @@ __constant__ float c_kern_IL[MAX_FILTER_WIDTH];
 __constant__ float c_kern_IH[MAX_FILTER_WIDTH];
 
 
-int w_iDivUp(int a, int b){
-    return (a % b != 0) ? (a / b + 1) : (a / b);
-}
-int w_ipow2(int a) {
-        if (a == 0) return 1;
-        return 2 << (a-1);
-}
-int w_ilog2(int i) {
-  int l = 0;
-  while (i >>= 1) { ++l; }
-  return l;
-}
-
-
 
 
 /// Compute the low-pass and high-pass filters for separable convolutions.
 /// wname: name of the filter ("haar", "db3", "sym4", ...)
-/// direction: 1 for forward transform, -1 for inverse transform
 /// Returns : the filter width "hlen" if success ; a negative value otherwise.
-int w_compute_filters(const char* wname, int direction, int do_swt) {
-    // Here "direction" is not taken into account : there is enough constant memory to store the four 1D fitlers
+int w_compute_filters_separable(const char* wname, int do_swt) {
     int hlen = 0;
     float* f1_l, *f1_h, *f1_il, *f1_ih;
 

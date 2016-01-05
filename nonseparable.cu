@@ -7,7 +7,8 @@
 //  - compute the inverse filters into the previous constant arrays, before W.inverse(). It is a little slower.
 //  - pre-compute c_kern_inv_XX once for all... faster, but twice more memory is used
 
-
+#include "filters.h"
+#include "common.h"
 
 #define MAX_FILTER_WIDTH 40
 
@@ -28,23 +29,6 @@ __constant__ float c_kern_HH[MAX_FILTER_WIDTH * MAX_FILTER_WIDTH];
 
 
 
-int w_iDivUp(int a, int b){
-    return (a % b != 0) ? (a / b + 1) : (a / b);
-}
-int w_ipow2(int a) {
-        return 1 << a;
-}
-int w_ilog2(int i) {
-  int l = 0;
-  while (i >>= 1) { ++l; }
-  return l;
-}
-void w_swap_ptr(float** a, float** b) {
-    float* tmp = *a;
-    *a = *b;
-    *b = tmp;
-}
-
 // outer product of arrays "a", "b" of length "len"
 float* w_outer(float* a, float* b, int len) {
     float* res = (float*) calloc(len*len, sizeof(float));
@@ -55,8 +39,6 @@ float* w_outer(float* a, float* b, int len) {
     }
     return res;
 }
-
-
 
 
 /// Compute the four filters A, H, V, D  from a family name.
@@ -377,8 +359,6 @@ __global__ void w_kern_inverse_swt(float* img, float* c_a, float* c_h, float* c_
         int jx1 = c - gidx;
         int jx2 = Nc - 1 - gidx + c;
 
-        // There are 4 threads/coeff index. Each thread will do a convolution with the even/odd indices of the kernels along each dimension.
-
         float res_a = 0, res_h = 0, res_v = 0, res_d = 0;
         for (int jy = 0; jy <= hR+hL; jy++) {
             int idx_y = gidy - c + jy*factor;
@@ -417,6 +397,7 @@ int w_forward_swt(float* d_image, float** d_coeffs, float* d_tmp, int Nr, int Nc
     w_kern_forward_swt<<<n_blocks, n_threads_per_block>>>(d_image, d_coeffs[0], d_coeffs[1], d_coeffs[2], d_coeffs[3], Nr, Nc, hlen, 1);
     for (int i=1; i < levels; i++) {
         w_kern_forward_swt<<<n_blocks, n_threads_per_block>>>(d_tmp1, d_tmp2, d_coeffs[3*i+1], d_coeffs[3*i+2], d_coeffs[3*i+3], Nr, Nc, hlen, i+1);
+        w_swap_ptr(&d_tmp1, &d_tmp2);
     }
     if ((levels & 1) == 0) cudaMemcpy(d_coeffs[0], d_tmp, Nr*Nc*sizeof(float), cudaMemcpyDeviceToDevice);
     return 0;
@@ -432,9 +413,10 @@ int w_inverse_swt(float* d_image, float** d_coeffs, float* d_tmp, int Nr, int Nc
 
     int tpb = 16; // TODO : tune for max perfs.
     dim3 n_threads_per_block = dim3(tpb, tpb, 1);
-    dim3 n_blocks;
+    dim3 n_blocks = dim3(w_iDivUp(Nc, tpb), w_iDivUp(Nr, tpb), 1);
     for (int i = levels-1; i >= 1; i--) {
         w_kern_inverse_swt<<<n_blocks, n_threads_per_block>>>(d_tmp2, d_tmp1, d_coeffs[3*i+1], d_coeffs[3*i+2], d_coeffs[3*i+3], Nr, Nc, hlen, i+1);
+        w_swap_ptr(&d_tmp1, &d_tmp2);
     }
     if ((levels & 1) == 0) cudaMemcpy(d_coeffs[0], d_tmp, Nr*Nc*sizeof(float), cudaMemcpyDeviceToDevice);
     // First scale

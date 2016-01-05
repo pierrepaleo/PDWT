@@ -2,6 +2,8 @@
 /// Wavelets coefficients, from http://wavelets.pybytes.com
 ///
 
+#ifndef FILTERS_H
+#define FILTERS_H
 
 float DB2_L[4] = {
     -0.12940952255092145,
@@ -6032,4 +6034,5 @@ wfilter all_filters[72] = {
 };
 
 
+#endif
 
