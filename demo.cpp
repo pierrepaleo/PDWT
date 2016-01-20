@@ -60,7 +60,7 @@ int main(int argc, char **argv) {
     if (argc < 4) {
         printf("Usage: %s <action> <wavelet> <levels> <separable> <stationary>\n", argv[0]);
         print_examples();
-        int what = request_user_choice();
+        what = request_user_choice();
         if (what == 0) return 0;
         prompt_wavelet(wname, &nlevels, &do_separable, &do_swt);
     }
@@ -73,7 +73,6 @@ int main(int argc, char **argv) {
 
     }
     if (what == 0) return 0;
-
 
     // Create the wavelet
     Wavelets W(img, Nr, Nc, wname, nlevels, 1, do_separable, do_cycle_spinning, do_swt);
