@@ -24,7 +24,6 @@
 #include "separable.cu"
 #include "nonseparable.cu"
 #include "haar.cu"
-
 #include "io.h"
 
 #  define CUDACHECK \
@@ -35,106 +34,6 @@
       exit(1);\
     }\
   }
-
-
-
-/// ****************************************************************************
-/// ******************** Common CUDA Kernels calls *****************************
-/// ****************************************************************************
-
-
-void wavelets_call_soft_thresh(float** d_coeffs, float beta, int Nr, int Nc, int nlevels, int do_swt, int do_thresh_appcoeffs) {
-    int tpb = 16; // Threads per block
-    dim3 n_threads_per_block = dim3(tpb, tpb, 1);
-    dim3 n_blocks;
-    int Nr2 = Nr, Nc2 = Nc;
-    if (!do_swt) {
-        Nr2 /= 2;
-        Nc2 /= 2;
-    }
-    if (do_thresh_appcoeffs) {
-        n_blocks = dim3(w_iDivUp(Nc2, tpb), w_iDivUp(Nr2, tpb), 1);
-        wavelets_kern_soft_thresh_appcoeffs<<<n_blocks, n_threads_per_block>>>(d_coeffs[0], beta, Nr2, Nc2);
-    }
-    for (int i = 0; i < nlevels; i++) {
-        if (!do_swt) {
-            Nr /= 2;
-            Nc /= 2;
-        }
-        n_blocks = dim3(w_iDivUp(Nc, tpb), w_iDivUp(Nr, tpb), 1);
-        wavelets_kern_soft_thresh<<<n_blocks, n_threads_per_block>>>(d_coeffs[3*i+1], d_coeffs[3*i+2], d_coeffs[3*i+3], beta, Nr, Nc);
-    }
-}
-
-
-// if inplace = 1, the result is in "d_image" ; otherwise result is in "d_image2".
-void wavelets_call_circshift(float* d_image, float* d_image2, int Nr, int Nc, int sr, int sc, int inplace /*= 1*/) {
-    // Modulus in C can be negative
-    if (sr < 0) sr += Nr; // or do while loops to ensure positive numbers
-    if (sc < 0) sc += Nc;
-    int tpb = 16; // Threads per block
-    sr = sr % Nr;
-    sc = sc % Nc;
-    dim3 n_blocks = dim3(w_iDivUp(Nc, tpb), w_iDivUp(Nr, tpb), 1);
-    dim3 n_threads_per_block = dim3(tpb, tpb, 1);
-    if (inplace) {
-        cudaMemcpy(d_image2, d_image, Nr*Nc*sizeof(float), cudaMemcpyDeviceToDevice);
-        wavelets_kern_circshift<<<n_blocks, n_threads_per_block>>>(d_image2, d_image, Nr, Nc, sr, sc);
-    }
-    else {
-        wavelets_kern_circshift<<<n_blocks, n_threads_per_block>>>(d_image, d_image2, Nr, Nc, sr, sc);
-    }
-}
-
-
-
-
-/// Creates an allocated/padded device array : [ An, H1, V1, D1, ..., Hn, Vn, Dn]
-float** w_create_coeffs_buffer(int Nr, int Nc, int nlevels, int do_swt) {
-    int Nr0 = Nr, Nc0 = Nc;
-    if (!do_swt) { Nr0 /= 2; Nc0 /= 2; }
-    float** res = (float**) calloc(3*nlevels+1, sizeof(float*));
-    // Coeffs (H, V, D)
-    for (int i = 1; i < 3*nlevels+1; i += 3) {
-        if (!do_swt) {
-            Nr /= 2;
-            Nc /= 2;
-        }
-        cudaMalloc(&(res[i]), Nr*Nc*sizeof(float));
-        cudaMemset(res[i], 0, Nr*Nc*sizeof(float));
-        cudaMalloc(&(res[i+1]), Nr*Nc*sizeof(float));
-        cudaMemset(res[i+1], 0, Nr*Nc*sizeof(float));
-        cudaMalloc(&(res[i+2]), Nr*Nc*sizeof(float));
-        cudaMemset(res[i+2], 0, Nr*Nc*sizeof(float));
-    }
-    // App coeff (last scale). They are also useful as a temp. buffer for the reconstruction, hence a bigger size
-    cudaMalloc(&(res[0]), Nr0*Nc0*sizeof(float));
-    cudaMemset(res[0], 0, Nr0*Nc0*sizeof(float));
-
-    return res;
-}
-
-/// Deep free of wavelet coefficients
-void w_free_coeffs_buffer(float** coeffs, int nlevels) {
-    for (int i = 0; i < 3*nlevels+1; i++) cudaFree(coeffs[i]);
-    free(coeffs);
-}
-
-/// Deep copy of wavelet coefficients. All structures must be allocated.
-void w_copy_coeffs_buffer(float** dst, float** src, int Nr, int Nc, int nlevels, int do_swt) {
-    // Coeffs (H, V, D)
-    for (int i = 1; i < 3*nlevels+1; i += 3) {
-        if (!do_swt) {
-            Nr /= 2;
-            Nc /= 2;
-        }
-        cudaMemcpy(dst[i], src[i], Nr*Nc*sizeof(float), cudaMemcpyDeviceToDevice);
-        cudaMemcpy(dst[i+1], src[i+1], Nr*Nc*sizeof(float), cudaMemcpyDeviceToDevice);
-        cudaMemcpy(dst[i+2], src[i+2], Nr*Nc*sizeof(float), cudaMemcpyDeviceToDevice);
-    }
-    // App coeff (last scale)
-    cudaMemcpy(dst[0], src[0], Nr*Nc*sizeof(float), cudaMemcpyDeviceToDevice);
-}
 
 
 
@@ -190,113 +89,82 @@ Wavelets::Wavelets(void) : d_image(NULL), Nr(0), Nc(0), nlevels(1), d_coeffs(NUL
 
 
 /// Constructor :  Wavelets from image
-Wavelets::Wavelets(float* img, int Nr, int Nc, const char* wname, int levels, int memisonhost, int do_separable, int do_cycle_spinning, int do_swt) : d_image(NULL), Nr(Nr), Nc(Nc), nlevels(levels), d_coeffs(NULL), do_cycle_spinning(do_cycle_spinning), d_tmp(NULL), current_shift_r(0), current_shift_c(0), do_swt(do_swt), do_separable(do_separable)
-  {
+Wavelets::Wavelets(
+    float* img,
+    int Nr,
+    int Nc,
+    const char* wname,
+    int levels,
+    int memisonhost,
+    int do_separable,
+    int do_cycle_spinning,
+    int do_swt) :
+    d_image(NULL),
+    Nr(Nr),
+    Nc(Nc),
+    nlevels(levels),
+    d_coeffs(NULL),
+    do_cycle_spinning(do_cycle_spinning),
+    d_tmp(NULL),
+    current_shift_r(0),
+    current_shift_c(0),
+    do_swt(do_swt),
+    do_separable(do_separable)
+{
 
-  if (nlevels < 1) {
-    puts("Warning: cannot initialize wavelet coefficients with nlevels < 1. Forcing nlevels = 1");
-    nlevels = 1;
-  }
-  // Image
-  float* d_arr_in;
-  cudaMalloc(&d_arr_in, Nr*Nc*sizeof(float));
-  if (!img) cudaMemset(d_arr_in, 0, Nr*Nc*sizeof(float));
-  else {
-    cudaMemcpyKind transfer;
-    if (memisonhost) transfer = cudaMemcpyHostToDevice;
-    else transfer = cudaMemcpyDeviceToDevice;
-    cudaMemcpy(d_arr_in, img, Nr*Nc*sizeof(float), transfer);
-  }
-  this->d_image = d_arr_in;
+    if (nlevels < 1) {
+        puts("Warning: cannot initialize wavelet coefficients with nlevels < 1. Forcing nlevels = 1");
+        nlevels = 1;
+    }
+      // Image
+    float* d_arr_in;
+    cudaMalloc(&d_arr_in, Nr*Nc*sizeof(float));
+    if (!img) cudaMemset(d_arr_in, 0, Nr*Nc*sizeof(float));
+    else {
+        cudaMemcpyKind transfer;
+        if (memisonhost) transfer = cudaMemcpyHostToDevice;
+        else transfer = cudaMemcpyDeviceToDevice;
+        cudaMemcpy(d_arr_in, img, Nr*Nc*sizeof(float), transfer);
+    }
+    this->d_image = d_arr_in;
 
-  float* d_tmp_new;
-  cudaMalloc(&d_tmp_new, 2*Nr*Nc*sizeof(float)); // Two temp. images
-  this->d_tmp = d_tmp_new;
+    float* d_tmp_new;
+    cudaMalloc(&d_tmp_new, 2*Nr*Nc*sizeof(float)); // Two temp. images
+    this->d_tmp = d_tmp_new;
 
-  // Coeffs
-  float** d_coeffs_new;
-  d_coeffs_new = w_create_coeffs_buffer(Nr, Nc, nlevels, do_swt);
-  this->d_coeffs = d_coeffs_new;
+    // Coeffs
+    float** d_coeffs_new;
+    d_coeffs_new = w_create_coeffs_buffer(Nr, Nc, nlevels, do_swt);
+    this->d_coeffs = d_coeffs_new;
 
-  // Filters
-  strncpy(this->wname, wname, 128);
-  int hlen = 0;
-  if (do_separable) hlen = w_compute_filters_separable(wname, do_swt);
-  else hlen = w_compute_filters(wname, 1, do_swt);
-  if (hlen == 0) {
-      printf("ERROR: unknown wavelet name %s\n", wname);
-      exit(1); // FIXME : more graceful error
-  }
-  this->hlen = hlen;
+    // Filters
+    strncpy(this->wname, wname, 128);
+    int hlen = 0;
+    if (do_separable) hlen = w_compute_filters_separable(wname, do_swt);
+    else hlen = w_compute_filters(wname, 1, do_swt);
+    if (hlen == 0) {
+        printf("ERROR: unknown wavelet name %s\n", wname);
+        exit(1); // FIXME : more graceful error
+    }
+    this->hlen = hlen;
 
-  // Compute max achievable level according to image dimensions and filter size
-  int N = min(Nr, Nc);
-  int wmaxlev = w_ilog2(N/hlen);
-  if (levels > wmaxlev) {
-    printf("Warn: required level (%d) is greater than the maximum possible level for %s (%d).\n", nlevels, wname, wmaxlev);
-    printf("Forcing nlevels = %d\n", wmaxlev);
-    nlevels = wmaxlev;
-  }
-  if (do_cycle_spinning && do_swt) puts("Warning: makes little sense to use Cycle spinning with stationary Wavelet transform");
+    // Compute max achievable level according to image dimensions and filter size
+    int N = min(Nr, Nc);
+    int wmaxlev = w_ilog2(N/hlen);
+    if (levels > wmaxlev) {
+        printf("Warn: required level (%d) is greater than the maximum possible level for %s (%d).\n", nlevels, wname, wmaxlev);
+        printf("Forcing nlevels = %d\n", wmaxlev);
+        nlevels = wmaxlev;
+    }
+    if (do_cycle_spinning && do_swt) puts("Warning: makes little sense to use Cycle spinning with stationary Wavelet transform");
 }
 
-//~ // Wavelets from coefficients (already on device -- TODO : handle on host)
-//~ Wavelets::Wavelets(float** d_thecoeffs, int Nr, int Nc, const char* wname, int levels, int do_cycle_spinning) : d_image(NULL), Nr(Nr), Nc(Nc), nlevels(levels), d_coeffs(NULL), do_cycle_spinning(do_cycle_spinning), d_tmp(NULL), current_shift_r(0), current_shift_c(0), do_swt(0)
-  //~ {
-//~
-  //~ if (nlevels < 1) {
-    //~ puts("Warning: cannot initialize wavelet coefficients with nlevels < 1. Forcing nlevels = 1");
-    //~ nlevels = 1;
-  //~ }
-//~
-  //~ float* d_theimage;
-  //~ cudaMalloc(&d_theimage, Nr*Nc*sizeof(float));
-  //~ cudaMemset(d_theimage, 0, Nr*Nc*sizeof(float)); // should not be necessary
-  //~ this->d_image = d_theimage;
-//~
-  //~ this->d_coeffs = d_thecoeffs; // No copy ?
-//~
-  //~ float* d_tmp_new;
-  //~ cudaMalloc(&d_tmp_new, Nr*Nc*sizeof(float));
-  //~ this->d_tmp = d_tmp_new;
-//~
-  //~ float** d_appcoeffs_new;
-  //~ d_appcoeffs_new = w_create_appcoeffs_buffer(Nr, Nc, nlevels, do_swt);
-  //~ this->d_appcoeffs = d_appcoeffs_new;
-//~
-  //~ // !
-  //~ int Nr2 = Nr/w_ipow2(nlevels), Nc2 = Nc/w_ipow2(nlevels);
-  //~ cudaMemcpy(d_appcoeffs_new[nlevels-1], d_thecoeffs[0], Nr2*Nc2*sizeof(float), cudaMemcpyDeviceToDevice);
-//~
-//~ }
-
-
-/// Copy
-//~ Wavelets::Wavelets(const Wavelets &W) { // FIXME : I don't understand the copy order. Wouldn't be the opposite ?
-  //~ Nr = W.Nr;
-  //~ Nc = W.Nc;
-  //~ nlevels = W.nlevels;
-  //~ do_cycle_spinning = W.do_cycle_spinning;
-  //~ current_shift_r = W.current_shift_r;
-  //~ current_shift_c = W.current_shift_c;
-  //~ float* d_new_image, *d_new_tmp;
-  //~ float** d_new_coeffs, **d_new_appcoeffs;
-  //~ size_t sz = Nr*Nc*sizeof(float);
-  //~ cudaMalloc(&d_new_image, sz);
-  //~ d_new_coeffs = w_create_coeffs_buffer(Nr, Nc, nlevels);
-  //~ d_new_appcoeffs = w_create_appcoeffs_buffer(Nr, Nc, nlevels);
-  //~ cudaMalloc(&d_new_tmp, sz);
-  //~ cudaMemcpy(d_image, d_new_image, sz, cudaMemcpyDeviceToDevice);
-  //~ w_copy_coeffs_buffer(d_coeffs, d_new_coeffs, Nr, Nc, nlevels);
-  //~ w_copy_appcoeffs_buffer(d_appcoeffs, d_new_appcoeffs, Nr, Nc, nlevels);
-  //~ cudaMemcpy(d_tmp, d_new_tmp, sz, cudaMemcpyDeviceToDevice);
-//~ }
 
 /// Destructor
 Wavelets::~Wavelets(void) {
-  if (d_image) cudaFree(d_image);
-  if (d_coeffs) w_free_coeffs_buffer(d_coeffs, nlevels);
-  if (d_tmp) cudaFree(d_tmp);
+    if (d_image) cudaFree(d_image);
+    if (d_coeffs) w_free_coeffs_buffer(d_coeffs, nlevels);
+    if (d_tmp) cudaFree(d_tmp);
 }
 
 /// Method : forward
@@ -339,46 +207,46 @@ void Wavelets::inverse(void) {
 
 /// Method : soft thresholding
 void Wavelets::soft_threshold(float beta, int do_thresh_appcoeffs) {
-  wavelets_call_soft_thresh(d_coeffs, beta, Nr, Nc, nlevels, do_swt, do_thresh_appcoeffs);
+    wavelets_call_soft_thresh(d_coeffs, beta, Nr, Nc, nlevels, do_swt, do_thresh_appcoeffs);
 }
 
 /// Method : circular shift
 // If inplace = 1, the result is in d_image ; otherwise result is in d_tmp.
 void Wavelets::circshift(int sr, int sc, int inplace) {
-  wavelets_call_circshift(d_image, d_tmp, Nr, Nc, sr, sc, inplace);
+    wavelets_call_circshift(d_image, d_tmp, Nr, Nc, sr, sc, inplace);
 }
 /// Method : squared L2 norm
 float Wavelets::norm2sq(void) {
-  float res = 0.0f;
-  int Nr2, Nc2;
-  if (!do_swt) { Nr2 = Nr/2; Nc2 = Nc/2; }
-  else { Nr2 = Nr; Nc2 = Nc; }
-  for (int i = 0; i < nlevels; i++) {
-    res += cublasSnrm2(Nr2*Nc2, d_coeffs[3*i+1], 1);
-    res += cublasSnrm2(Nr2*Nc2, d_coeffs[3*i+2], 1);
-    res += cublasSnrm2(Nr2*Nc2, d_coeffs[3*i+3], 1);
-    if (!do_swt) { Nr2 /= 2; Nc2 /= 2; }
-  }
-  int nels = ((do_swt) ? (Nr2*Nc2) : (Nr2*Nc2*4));
-  res += cublasSnrm2(nels, d_coeffs[0], 1);
-  return res;
+    float res = 0.0f;
+    int Nr2, Nc2;
+    if (!do_swt) { Nr2 = Nr/2; Nc2 = Nc/2; }
+    else { Nr2 = Nr; Nc2 = Nc; }
+    for (int i = 0; i < nlevels; i++) {
+        res += cublasSnrm2(Nr2*Nc2, d_coeffs[3*i+1], 1);
+        res += cublasSnrm2(Nr2*Nc2, d_coeffs[3*i+2], 1);
+        res += cublasSnrm2(Nr2*Nc2, d_coeffs[3*i+3], 1);
+        if (!do_swt) { Nr2 /= 2; Nc2 /= 2; }
+    }
+    int nels = ((do_swt) ? (Nr2*Nc2) : (Nr2*Nc2*4));
+    res += cublasSnrm2(nels, d_coeffs[0], 1);
+    return res;
 }
 
 /// Method : L1 norm
 float Wavelets::norm1(void) {
-  float res = 0.0f;
-  int Nr2, Nc2;
-  if (!do_swt) { Nr2 = Nr/2; Nc2 = Nc/2; }
-  else { Nr2 = Nr; Nc2 = Nc; }
-  for (int i = 0; i < nlevels; i++) {
-    res += cublasSasum(Nr2*Nc2, d_coeffs[3*i+1], 1);
-    res += cublasSasum(Nr2*Nc2, d_coeffs[3*i+2], 1);
-    res += cublasSasum(Nr2*Nc2, d_coeffs[3*i+3], 1);
-    if (!do_swt) { Nr2 /= 2; Nc2 /= 2; }
-  }
-  int nels = ((do_swt) ? (Nr2*Nc2) : (Nr2*Nc2*4));
-  res += cublasSasum(nels, d_coeffs[0], 1);
-  return res;
+    float res = 0.0f;
+    int Nr2, Nc2;
+    if (!do_swt) { Nr2 = Nr/2; Nc2 = Nc/2; }
+    else { Nr2 = Nr; Nc2 = Nc; }
+    for (int i = 0; i < nlevels; i++) {
+        res += cublasSasum(Nr2*Nc2, d_coeffs[3*i+1], 1);
+        res += cublasSasum(Nr2*Nc2, d_coeffs[3*i+2], 1);
+        res += cublasSasum(Nr2*Nc2, d_coeffs[3*i+3], 1);
+        if (!do_swt) { Nr2 /= 2; Nc2 /= 2; }
+    }
+    int nels = ((do_swt) ? (Nr2*Nc2) : (Nr2*Nc2*4));
+    res += cublasSasum(nels, d_coeffs[0], 1);
+    return res;
 }
 
 /// Method : get the image from device
@@ -386,6 +254,15 @@ int Wavelets::get_image(float* res) { // TODO: more defensive
     cudaMemcpy(res, d_image, Nr*Nc*sizeof(float), cudaMemcpyDeviceToHost);
     return Nr*Nc;
 }
+
+/// Method : set the class image
+void Wavelets::set_image(float* img, int mem_is_on_device) { // There are no memory check !
+    cudaMemcpyKind copykind;
+    if (mem_is_on_device) copykind = cudaMemcpyDeviceToDevice;
+    else copykind = cudaMemcpyHostToDevice;
+    cudaMemcpy(d_image, img, Nr*Nc*sizeof(float), copykind);
+}
+
 
 /// Method : get a coefficient vector from device
 int Wavelets::get_coeff(float* coeff, int num) {
@@ -395,6 +272,7 @@ int Wavelets::get_coeff(float* coeff, int num) {
         Nr2 /= factor;
         Nc2 /= factor;
     }
+    //~ printf("Retrieving %d (%d x %d)\n", num, Nr2, Nc2);
     cudaMemcpy(coeff, d_coeffs[num], Nr2*Nc2*sizeof(float), cudaMemcpyDeviceToHost);
     return Nr2*Nc2;
 }
@@ -432,116 +310,9 @@ void Wavelets::print_informations() {
     cudaGetDeviceProperties(&properties, device);
     char* device_name = strdup(properties.name);
     printf("Running on device : %s\n", device_name);
+    free(device_name);
     puts("--------------------------------------------------");
-
-
 }
-
-/*
-// Inline operators that should not be members
- // operator += (member !) is more efficient since there is no copy...
-inline Wavelets operator+(Wavelets lhs, const Wavelets &rhs) {
-    lhs += rhs;
-    return lhs;
-}
-* */
-
-
-
-
-
-
-
-
-/// ----------------------------------------------------------------------------
-/// -------------------------- Wrapper for shared lib --------------------------
-/// ----------------------------------------------------------------------------
-/*
-
-extern "C" {
-    int wrap_forward_haar(float* image, int Nr, int Nc, int nlevels, float*** coeffs, int do_cycle_spinning);
-    int wrap_inverse_haar(float** image, int Nr, int Nc, int nlevels, float** coeffs, int do_cycle_spinning);
-    int wrap_forward_softthresh_inverse(float* image, int Nr, int Nc, int nlevels, int do_cycle_spinning, float beta);
-}
-
-int wrap_forward_haar(float* image, int Nr, int Nc, int nlevels, float*** coeffs, int do_cycle_spinning) {
-    // Build the Wavelet class
-    Wavelets W(image, Nr, Nc, "haar", nlevels, 1, do_cycle_spinning);
-    W.forward();
-    // Retrieve the coefficients from device
-    float** thecoeffs = (float**) calloc(3*nlevels+1, sizeof(float*));
-    int Nr2 = Nr, Nc2 = Nc;
-    for (int i = 0; i < nlevels; i++) {
-        Nr2 /= 2; Nc2 /= 2;
-        for (int j = 1; j <= 3; j++) {
-            thecoeffs[3*i+1] = (float*) calloc(Nr2*Nc2, sizeof(float));
-            cudaMemcpy(thecoeffs[3*i+j], W.d_coeffs[3*i+j], Nr2*Nc2*sizeof(float), cudaMemcpyDeviceToHost);
-        }
-    }
-    // App coeff
-    thecoeffs[0] = (float*) calloc(Nr2*Nc2, sizeof(float));
-    cudaMemcpy(thecoeffs[0], W.d_appcoeffs[nlevels-1], Nr2*Nc2*sizeof(float), cudaMemcpyDeviceToHost);
-
-    *coeffs = thecoeffs;
-    return 0;
-}
-
-int wrap_inverse_haar(float** image, int Nr, int Nc, int nlevels, float** coeffs, int do_cycle_spinning) {
-    // Transfer the coeffs into device
-    int Nr2 = Nr, Nc2 = Nc;
-    float** d_coeffs = (float**) calloc(3*nlevels+1, sizeof(float));
-    for (int i = 0; i < nlevels; i++) {
-        Nr2 /= 2; Nc2 /= 2;
-        for (int j = 1; j <= 3; j++) {
-            cudaMalloc(&(d_coeffs[3*i+j]), Nr2*Nc2*sizeof(float));
-            cudaMemcpy(d_coeffs[3*i+j], coeffs[3*i+j], Nr2*Nc2*sizeof(float), cudaMemcpyHostToDevice);
-        }
-    }
-    cudaMalloc(&(d_coeffs[0]), Nr2*Nc2*sizeof(float));
-    cudaMemcpy(d_coeffs[0], coeffs[0], Nr2*Nc2*sizeof(float), cudaMemcpyHostToDevice);
-
-    // Build the Wavelet class from these coefficients
-    Wavelets W(d_coeffs, Nr, Nc, "haar", nlevels, do_cycle_spinning);
-    W.inverse();
-
-    // Retrieve the image
-    float* theimage = (float*) calloc(Nr*Nc, sizeof(float));
-    cudaMemcpy(theimage, W.d_image, Nr*Nc*sizeof(float), cudaMemcpyDeviceToHost);
-    *image = theimage;
-
-    return 0;
-}
-
-// in-place...
-int wrap_forward_softthresh_inverse(float* image, int Nr, int Nc, int nlevels, int do_cycle_spinning, float beta) {
-    Wavelets W(image, Nr, Nc, "haar", nlevels, 1, do_cycle_spinning);
-    W.forward();
-    W.soft_threshold(beta);
-    W.inverse();
-    W.get_image(image);
-    return 0;
-}
-
-// TODO : wrap norms...
-
-/// Test : can we wrap the whole class ?
-
-int wrap_test(float* image, int Nr, int Nc, int nlevels, int do_cycle_spinning, void* Wstruct) {
-
-    //~ Wavelets* foo = static_cast<Wavelets*>(Wstruct);
-
-    //~ Wavelets W(image, Nr, Nc, nlevels, 1, do_cycle_spinning);
-    //~ Wstruct =  (void*) W;
-    return 0;
-}
-
-*/
-
-
-
-
-
-
 
 
 

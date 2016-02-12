@@ -18,4 +18,17 @@ __global__ void wavelets_kern_soft_thresh_appcoeffs(float* c_a, float beta, int 
 
 __global__ void wavelets_kern_circshift(float* d_image, float* d_out, int Nr, int Nc, int sr, int sc);
 
+
+void wavelets_call_soft_thresh(float** d_coeffs, float beta, int Nr, int Nc, int nlevels, int do_swt, int do_thresh_appcoeffs);
+
+void wavelets_call_circshift(float* d_image, float* d_image2, int Nr, int Nc, int sr, int sc, int inplace = 1);
+
+float** w_create_coeffs_buffer(int Nr, int Nc, int nlevels, int do_swt);
+
+void w_free_coeffs_buffer(float** coeffs, int nlevels);
+
+void w_copy_coeffs_buffer(float** dst, float** src, int Nr, int Nc, int nlevels, int do_swt);
+
+
+
 #endif

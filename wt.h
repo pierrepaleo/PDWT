@@ -2,17 +2,6 @@
 #define WT_H
 
 
-void wavelets_call_soft_thresh(float** d_coeffs, float beta, int Nr, int Nc, int nlevels, int do_swt, int do_thresh_appcoeffs);
-
-void wavelets_call_circshift(float* d_image, float* d_image2, int Nr, int Nc, int sr, int sc, int inplace = 1);
-
-float** w_create_coeffs_buffer(int Nr, int Nc, int nlevels, int do_swt);
-
-void w_free_coeffs_buffer(float** coeffs, int nlevels);
-
-void w_copy_coeffs_buffer(float** dst, float** src, int Nr, int Nc, int nlevels, int do_swt);
-
-
 class Wavelets {
   public:
     // Members
@@ -57,6 +46,7 @@ class Wavelets {
     int get_image(float* img);
     void print_informations();
     int get_coeff(float* coeff, int num);
+    void set_image(float* img, int mem_is_on_device = 0);
 
 };
 

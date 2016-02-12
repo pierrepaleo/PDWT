@@ -6,8 +6,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+//~ #include <unistd.h>
 #include "wt.h"
 #include "io.h"
+
+
+
 
 #include "tests.h"
 
@@ -59,6 +65,29 @@ int test_forward(float* img, int Nr, int Nc, const char* wname, int nlevels, int
     free(wfile_det);
 
 }
+
+
+int create_folder_if_not_existing(const char* fname) {
+    struct stat st = {0};
+    int res = -2; // already exists
+    if (stat(fname, &st) == -1) res = mkdir(fname, 0755);
+    return res;
+}
+
+// paths are assumed to be unix-like
+int load_python_transform(char* wname, int levels, char* savedir, int do_dwt) {
+
+    what = ??
+    s = app, detN
+    // ex : path/db10_3_dwt_det1.dat
+    snprintf(fullname, 511, "%s/%s_%d_%s", savedir, wname, levels, whichtransform, whichcoeff)
+    strncat(fullname, savedir, "/"
+
+
+
+}
+
+
 
 
 
