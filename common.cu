@@ -3,6 +3,10 @@
 /// ****************************************************************************
 
 #include "common.h"
+# define W_SIGN(a) ((a > 0) ? (1.0f) : (-1.0f))
+#include <cublas.h>
+
+
 
 int w_iDivUp(int a, int b) {
     return (a % b != 0) ? (a / b + 1) : (a / b);
@@ -34,7 +38,7 @@ void w_swap_ptr(float** a, float** b) {
 
 
 /// Must be lanched with block size (Nc, Nr) : the size of the current coefficient vector
-__global__ void wavelets_kern_soft_thresh(float* c_h, float* c_v, float* c_d, float beta, int Nr, int Nc) {
+__global__ void w_kern_soft_thresh(float* c_h, float* c_v, float* c_d, float beta, int Nr, int Nc) {
     int gidx = threadIdx.x + blockIdx.x*blockDim.x;
     int gidy = threadIdx.y + blockIdx.y*blockDim.y;
     float val = 0.0f;
@@ -50,9 +54,7 @@ __global__ void wavelets_kern_soft_thresh(float* c_h, float* c_v, float* c_d, fl
     }
 }
 
-
-
-__global__ void wavelets_kern_soft_thresh_appcoeffs(float* c_a, float beta, int Nr, int Nc) {
+__global__ void w_kern_soft_thresh_appcoeffs(float* c_a, float beta, int Nr, int Nc) {
     int gidx = threadIdx.x + blockIdx.x*blockDim.x;
     int gidy = threadIdx.y + blockIdx.y*blockDim.y;
     float val = 0.0f;
@@ -63,7 +65,35 @@ __global__ void wavelets_kern_soft_thresh_appcoeffs(float* c_a, float beta, int 
 }
 
 
-__global__ void wavelets_kern_circshift(float* d_image, float* d_out, int Nr, int Nc, int sr, int sc) {
+/// Must be lanched with block size (Nc, Nr) : the size of the current coefficient vector
+__global__ void w_kern_hard_thresh(float* c_h, float* c_v, float* c_d, float beta, int Nr, int Nc) {
+    int gidx = threadIdx.x + blockIdx.x*blockDim.x;
+    int gidy = threadIdx.y + blockIdx.y*blockDim.y;
+    float val = 0.0f;
+    if (gidx < Nc && gidy < Nr) {
+        val = c_h[gidy*Nc + gidx];
+        c_h[gidy*Nc + gidx] = max(W_SIGN(fabsf(val)-beta), 0.0f)*val;
+
+        val = c_v[gidy*Nc + gidx];
+        c_v[gidy*Nc + gidx] = max(W_SIGN(fabsf(val)-beta), 0.0f)*val;
+
+        val = c_d[gidy*Nc + gidx];
+        c_d[gidy*Nc + gidx] = max(W_SIGN(fabsf(val)-beta), 0.0f)*val;
+    }
+}
+
+__global__ void w_kern_hard_thresh_appcoeffs(float* c_a, float beta, int Nr, int Nc) {
+    int gidx = threadIdx.x + blockIdx.x*blockDim.x;
+    int gidy = threadIdx.y + blockIdx.y*blockDim.y;
+    float val = 0.0f;
+    if (gidx < Nc && gidy < Nr) {
+        val = c_a[gidy*Nc + gidx];
+        c_a[gidy*Nc + gidx] = max(W_SIGN(fabsf(val)-beta), 0.0f)*val;
+    }
+}
+
+
+__global__ void w_kern_circshift(float* d_image, float* d_out, int Nr, int Nc, int sr, int sc) {
     int gidx = threadIdx.x + blockIdx.x*blockDim.x;
     int gidy = threadIdx.y + blockIdx.y*blockDim.y;
     if (gidx < Nc && gidy < Nr) {
@@ -82,7 +112,7 @@ __global__ void wavelets_kern_circshift(float* d_image, float* d_out, int Nr, in
 /// ****************************************************************************
 
 
-void wavelets_call_soft_thresh(float** d_coeffs, float beta, int Nr, int Nc, int nlevels, int do_swt, int do_thresh_appcoeffs) {
+void w_call_soft_thresh(float** d_coeffs, float beta, int Nr, int Nc, int nlevels, int do_swt, int do_thresh_appcoeffs) {
     int tpb = 16; // Threads per block
     dim3 n_threads_per_block = dim3(tpb, tpb, 1);
     dim3 n_blocks;
@@ -93,7 +123,7 @@ void wavelets_call_soft_thresh(float** d_coeffs, float beta, int Nr, int Nc, int
     }
     if (do_thresh_appcoeffs) {
         n_blocks = dim3(w_iDivUp(Nc2, tpb), w_iDivUp(Nr2, tpb), 1);
-        wavelets_kern_soft_thresh_appcoeffs<<<n_blocks, n_threads_per_block>>>(d_coeffs[0], beta, Nr2, Nc2);
+        w_kern_soft_thresh_appcoeffs<<<n_blocks, n_threads_per_block>>>(d_coeffs[0], beta, Nr2, Nc2);
     }
     for (int i = 0; i < nlevels; i++) {
         if (!do_swt) {
@@ -101,13 +131,61 @@ void wavelets_call_soft_thresh(float** d_coeffs, float beta, int Nr, int Nc, int
             Nc /= 2;
         }
         n_blocks = dim3(w_iDivUp(Nc, tpb), w_iDivUp(Nr, tpb), 1);
-        wavelets_kern_soft_thresh<<<n_blocks, n_threads_per_block>>>(d_coeffs[3*i+1], d_coeffs[3*i+2], d_coeffs[3*i+3], beta, Nr, Nc);
+        w_kern_soft_thresh<<<n_blocks, n_threads_per_block>>>(d_coeffs[3*i+1], d_coeffs[3*i+2], d_coeffs[3*i+3], beta, Nr, Nc);
     }
 }
 
 
+void w_call_hard_thresh(float** d_coeffs, float beta, int Nr, int Nc, int nlevels, int do_swt, int do_thresh_appcoeffs) {
+    int tpb = 16; // Threads per block
+    dim3 n_threads_per_block = dim3(tpb, tpb, 1);
+    dim3 n_blocks;
+    int Nr2 = Nr, Nc2 = Nc;
+    if (!do_swt) {
+        Nr2 /= 2;
+        Nc2 /= 2;
+    }
+    if (do_thresh_appcoeffs) {
+        n_blocks = dim3(w_iDivUp(Nc2, tpb), w_iDivUp(Nr2, tpb), 1);
+        w_kern_hard_thresh_appcoeffs<<<n_blocks, n_threads_per_block>>>(d_coeffs[0], beta, Nr2, Nc2);
+    }
+    for (int i = 0; i < nlevels; i++) {
+        if (!do_swt) {
+            Nr /= 2;
+            Nc /= 2;
+        }
+        n_blocks = dim3(w_iDivUp(Nc, tpb), w_iDivUp(Nr, tpb), 1);
+        w_kern_hard_thresh<<<n_blocks, n_threads_per_block>>>(d_coeffs[3*i+1], d_coeffs[3*i+2], d_coeffs[3*i+3], beta, Nr, Nc);
+    }
+}
+
+
+void w_shrink(float** d_coeffs, float beta, int Nr, int Nc, int nlevels, int do_swt, int do_thresh_appcoeffs) {
+    int Nr2 = Nr, Nc2 = Nc;
+    if (!do_swt) {
+        Nr2 /= 2;
+        Nc2 /= 2;
+    }
+    if (do_thresh_appcoeffs) {
+        cublasSscal(Nr2*Nc2, 1.0f/(1.0f + beta), d_coeffs[0], 1);
+    }
+    for (int i = 0; i < nlevels; i++) {
+        if (!do_swt) {
+            Nr /= 2;
+            Nc /= 2;
+        }
+        cublasSscal(Nr*Nc, 1.0f/(1.0f + beta), d_coeffs[3*i+1], 1);
+        cublasSscal(Nr*Nc, 1.0f/(1.0f + beta), d_coeffs[3*i+2], 1);
+        cublasSscal(Nr*Nc, 1.0f/(1.0f + beta), d_coeffs[3*i+3], 1);
+    }
+}
+
+
+
+
+
 // if inplace = 1, the result is in "d_image" ; otherwise result is in "d_image2".
-void wavelets_call_circshift(float* d_image, float* d_image2, int Nr, int Nc, int sr, int sc, int inplace /*= 1*/) {
+void w_call_circshift(float* d_image, float* d_image2, int Nr, int Nc, int sr, int sc, int inplace /*= 1*/) {
     // Modulus in C can be negative
     if (sr < 0) sr += Nr; // or do while loops to ensure positive numbers
     if (sc < 0) sc += Nc;
@@ -118,10 +196,10 @@ void wavelets_call_circshift(float* d_image, float* d_image2, int Nr, int Nc, in
     dim3 n_threads_per_block = dim3(tpb, tpb, 1);
     if (inplace) {
         cudaMemcpy(d_image2, d_image, Nr*Nc*sizeof(float), cudaMemcpyDeviceToDevice);
-        wavelets_kern_circshift<<<n_blocks, n_threads_per_block>>>(d_image2, d_image, Nr, Nc, sr, sc);
+        w_kern_circshift<<<n_blocks, n_threads_per_block>>>(d_image2, d_image, Nr, Nc, sr, sc);
     }
     else {
-        wavelets_kern_circshift<<<n_blocks, n_threads_per_block>>>(d_image, d_image2, Nr, Nc, sr, sc);
+        w_kern_circshift<<<n_blocks, n_threads_per_block>>>(d_image, d_image2, Nr, Nc, sr, sc);
     }
 }
 

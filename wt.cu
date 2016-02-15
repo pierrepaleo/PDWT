@@ -2,13 +2,9 @@
  *
  * TODO :
  *
- *  - W.set_image, get_image,
- *  - Better structure/separation between kernels and host calls    (almost)
- *  - nlevels can be modified while creating wavelet => pass reference
  *  - Allow both separable and non-separable without re-compiling   (OK)
  *  - User can choose the target device                             (TODO)
  *  - User can provide non-separable filters                        (TODO)
- *  - Hard Threshold and L2-threshold                               (TODO)
  *  - Doc ! (get_coeffs, ...)
  *
  */
@@ -205,15 +201,27 @@ void Wavelets::inverse(void) {
     }
 }
 
-/// Method : soft thresholding
+/// Method : soft thresholding (L1 proximal)
 void Wavelets::soft_threshold(float beta, int do_thresh_appcoeffs) {
-    wavelets_call_soft_thresh(d_coeffs, beta, Nr, Nc, nlevels, do_swt, do_thresh_appcoeffs);
+    w_call_soft_thresh(d_coeffs, beta, Nr, Nc, nlevels, do_swt, do_thresh_appcoeffs);
 }
+
+/// Method : hard thresholding
+void Wavelets::hard_threshold(float beta, int do_thresh_appcoeffs) {
+    w_call_hard_thresh(d_coeffs, beta, Nr, Nc, nlevels, do_swt, do_thresh_appcoeffs);
+}
+
+/// Method : shrink (L2 proximal)
+void Wavelets::shrink(float beta, int do_thresh_appcoeffs) {
+    w_shrink(d_coeffs, beta, Nr, Nc, nlevels, do_swt, do_thresh_appcoeffs);
+}
+
+
 
 /// Method : circular shift
 // If inplace = 1, the result is in d_image ; otherwise result is in d_tmp.
 void Wavelets::circshift(int sr, int sc, int inplace) {
-    wavelets_call_circshift(d_image, d_tmp, Nr, Nc, sr, sc, inplace);
+    w_call_circshift(d_image, d_tmp, Nr, Nc, sr, sc, inplace);
 }
 /// Method : squared L2 norm
 float Wavelets::norm2sq(void) {

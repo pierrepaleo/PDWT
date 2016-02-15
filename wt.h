@@ -39,6 +39,8 @@ class Wavelets {
     // -------
     void forward();
     void soft_threshold(float beta, int do_thresh_appcoeffs = 1);
+    void hard_threshold(float beta, int do_thresh_appcoeffs = 1);
+    void shrink(float beta, int do_thresh_appcoeffs = 1);
     void circshift(int sr, int sc, int inplace = 1);
     void inverse();
     float norm2sq();

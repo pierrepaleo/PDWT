@@ -15,8 +15,8 @@ int main(int argc, char **argv) {
     float* img = read_dat_file_float("lena.dat", Nr*Nc);
 
     // Configure DWT
-    const char wname[128] = "haar";
-    int nlevels = 4;
+    const char wname[128] = "db3"; //"haar";
+    int nlevels = 2; //4;
     int do_separable = 1;
     int do_swt = 0;
     int do_cycle_spinning = 0;
