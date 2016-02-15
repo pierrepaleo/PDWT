@@ -109,6 +109,11 @@ int main(int argc, char **argv) {
 
 
     // Perform inverse WT with current configuration
+    /*
+    float* dummy = (float*) calloc(Nr*Nc, sizeof(float));
+    W.set_image(dummy, 0);
+    W.inverse();
+    * */
     W.inverse();
     puts("Inverse OK");
 

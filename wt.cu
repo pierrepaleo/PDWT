@@ -2,6 +2,9 @@
  *
  * TODO :
  *
+ *  - W.coeffs[0] is over-written after an inversion.               (FIXME)
+ *      so if  W.inverse() is run twice : invalid inverse.
+ *      => Implement W.state ?
  *  - Allow both separable and non-separable without re-compiling   (OK)
  *  - User can choose the target device                             (TODO)
  *  - User can provide non-separable filters                        (TODO)
@@ -95,6 +98,7 @@ Wavelets::Wavelets(
     int do_separable,
     int do_cycle_spinning,
     int do_swt) :
+
     d_image(NULL),
     Nr(Nr),
     Nc(Nc),
@@ -105,7 +109,8 @@ Wavelets::Wavelets(
     current_shift_r(0),
     current_shift_c(0),
     do_swt(do_swt),
-    do_separable(do_separable)
+    do_separable(do_separable),
+    state(W_INIT)
 {
 
     if (nlevels < 1) {
@@ -181,9 +186,14 @@ void Wavelets::forward(void) {
             else w_forward_swt(d_image, d_coeffs, d_tmp, Nr, Nc, nlevels, hlen);
         }
     }
+    state = W_FORWARD;
 }
 /// Method : inverse
 void Wavelets::inverse(void) {
+    if (state == W_INVERSE) { // TODO: what to do in this case ? Force re-compute, or abort ?
+        puts("Warning: W.inverse() has already been run. Inverse is available in W.get_image()");
+        return;
+    }
     if ((hlen == 2) && (!do_swt)) haar_inverse2d(d_image, d_coeffs, d_tmp, Nr, Nc, nlevels);
     else {
         if (do_separable) {
@@ -199,20 +209,33 @@ void Wavelets::inverse(void) {
             circshift(-current_shift_r, -current_shift_c, 1);
         }
     }
+    state = W_INVERSE;
 }
 
 /// Method : soft thresholding (L1 proximal)
 void Wavelets::soft_threshold(float beta, int do_thresh_appcoeffs) {
+    if (state == W_INVERSE) {
+        puts("Warning: Wavelets(): cannot threshold coefficients, as they were modified by W.inverse()");
+        return;
+    }
     w_call_soft_thresh(d_coeffs, beta, Nr, Nc, nlevels, do_swt, do_thresh_appcoeffs);
 }
 
 /// Method : hard thresholding
 void Wavelets::hard_threshold(float beta, int do_thresh_appcoeffs) {
+    if (state == W_INVERSE) {
+        puts("Warning: Wavelets(): cannot threshold coefficients, as they were modified by W.inverse()");
+        return;
+    }
     w_call_hard_thresh(d_coeffs, beta, Nr, Nc, nlevels, do_swt, do_thresh_appcoeffs);
 }
 
 /// Method : shrink (L2 proximal)
 void Wavelets::shrink(float beta, int do_thresh_appcoeffs) {
+    if (state == W_INVERSE) {
+        puts("Warning: Wavelets(): cannot threshold coefficients, as they were modified by W.inverse()");
+        return;
+    }
     w_shrink(d_coeffs, beta, Nr, Nc, nlevels, do_swt, do_thresh_appcoeffs);
 }
 
@@ -269,6 +292,7 @@ void Wavelets::set_image(float* img, int mem_is_on_device) { // There are no mem
     if (mem_is_on_device) copykind = cudaMemcpyDeviceToDevice;
     else copykind = cudaMemcpyHostToDevice;
     cudaMemcpy(d_image, img, Nr*Nc*sizeof(float), copykind);
+    state = W_INIT;
 }
 
 

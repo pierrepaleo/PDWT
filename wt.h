@@ -2,6 +2,16 @@
 #define WT_H
 
 
+// Possible states of the Wavelet class.
+// It prevents, for example, W.inverse() from being run twice (since W.d_coeffs[0] is modified)
+typedef enum w_state {
+    W_INIT,      // The class has just been initialized (coeffs not computed)
+    W_FORWARD,   // W.forward() has just been performed (coeffs computed)
+    W_INVERSE,   // W.inverse() has just been performed (d_image modified, coeffs modified !)
+    W_THRESHOLD  // The coefficients have been modified
+} w_state;
+
+
 class Wavelets {
   public:
     // Members
@@ -19,6 +29,7 @@ class Wavelets {
     char wname[128]; // Wavelet name
     int do_swt; // 1 if performing undecimated WT
     int do_separable; // 1 if performing separable WT
+    w_state state;
 
     // Operations
     // -----------
