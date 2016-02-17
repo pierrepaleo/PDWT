@@ -6011,8 +6011,8 @@ wfilter all_filters[72] = {
     { "bior3.7", 16, BIOR3_7_L, BIOR3_7_H, BIOR3_7_I_L, BIOR3_7_I_H },
     { "bior3.9", 20, BIOR3_9_L, BIOR3_9_H, BIOR3_9_I_L, BIOR3_9_I_H },
     { "bior4.4", 10, BIOR4_4_L, BIOR4_4_H, BIOR4_4_I_L, BIOR4_4_I_H },
-    { "bior5.5", 10, BIOR5_5_L, BIOR5_5_H, BIOR5_5_I_L, BIOR5_5_I_H },
-    { "bior6.8", 10, BIOR4_4_L, BIOR4_4_H, BIOR4_4_I_L, BIOR4_4_I_H },
+    { "bior5.5", 12, BIOR5_5_L, BIOR5_5_H, BIOR5_5_I_L, BIOR5_5_I_H },
+    { "bior6.8", 18, BIOR6_8_L, BIOR6_8_H, BIOR6_8_I_L, BIOR6_8_I_H },
 
     { "rbio1.3", 6, RBIOR1_3_L, RBIOR1_3_H, RBIOR1_3_I_L, RBIOR1_3_I_H },
     { "rbio1.5", 10, RBIOR1_5_L, RBIOR1_5_H, RBIOR1_5_I_L, RBIOR1_5_I_H },
