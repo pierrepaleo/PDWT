@@ -205,10 +205,8 @@ void Wavelets::inverse(void) {
             if (!do_swt) w_inverse(d_image, d_coeffs, d_tmp, Nr, Nc, nlevels, hlen);
             else w_inverse_swt(d_image, d_coeffs, d_tmp, Nr, Nc, nlevels, hlen);
         }
-        if (do_cycle_spinning) {
-            circshift(-current_shift_r, -current_shift_c, 1);
-        }
     }
+    if (do_cycle_spinning) circshift(-current_shift_r, -current_shift_c, 1);
     state = W_INVERSE;
 }
 
