@@ -13,17 +13,17 @@
  */
 #include <stdio.h>
 #include <stdlib.h>
-#include <math.h>
+//~ #include <math.h>
 #include <cuda.h>
 #include <cublas.h>
 #include <cuComplex.h>
-#include <time.h>
+//~ #include <time.h>
 
 #include "wt.h"
 #include "separable.cu"
 #include "nonseparable.cu"
 #include "haar.cu"
-#include "io.h"
+//~ #include "io.h"
 
 #  define CUDACHECK \
   { cudaThreadSynchronize(); \
@@ -298,6 +298,10 @@ void Wavelets::set_image(float* img, int mem_is_on_device) { // There are no mem
 
 /// Method : get a coefficient vector from device
 int Wavelets::get_coeff(float* coeff, int num) {
+    if (state == W_INVERSE) {
+        puts("Warning: get_coeff(): inverse() has been performed, the coefficients has been modified and do not make sense anymore.");
+        // TODO : then what ?
+    }
     int Nr2 = Nr, Nc2 = Nc;
     if (!do_swt) {
         int factor = ((num == 0) ? (w_ipow2(nlevels)) : (w_ipow2((num-1)/3 +1)));
