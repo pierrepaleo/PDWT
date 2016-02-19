@@ -1,26 +1,34 @@
-## Plugable Parallel DWT
+## Parallel DWT
 
-PPDWT is (yet another) implementation of the Discrete Wavelet Transform (DWT) on GPU.
-It primarily aims to be fast, simple and versatile for an easy integration in a bigger project.
+PDWT is (yet another) parallel implementation of the Discrete Wavelet Transform (DWT).
+This implementation in CUDA targets Nvidia GPUs.
 
-There are a few others parallel implementations of DWT, but most of them are not designed to be embedded in a project, or are specific to certain wavelets (for example (5, 3) or (9, 7)).
-In this implementation, the DWT is readily computed from the provided analysis and synthesis filters.
-You can either choose filters from standard families (Daubechies, symmetric, (reverse) biorthogonal, Coiffman), or design your own filters.
+PDWT primarily aims at being fast, simple and versatile for an easy integration in a bigger project.
+For example, the easy interface and thresholding functions make it interesting for sparse regularization of inverse problems.
 
 
 ## Features
 
-* 2D transform (1D and 3D coming soon)
+* 2D transform, multi-levels
 * Separable and non-separable transforms
-* 72 available separable wavelets (i.e 288 filters)
-* Thresholding and norms functions
+* DWT and SWT, both in separable/nonseparable mode
+* 72 available separable wavelets
+* Custom wavelets can be defined
+* Thresholding and norms utilities
 * Random shift utility for translation-invariant denoising
+* Simple interface (see examples)
+* Python binding available
+* Results compatible with Matlab wavelet toolbox / Python pywt.
 
 All the transforms are computed with the **periodic boundary extension** (the dimensions are halved at each scale).
 
 ## Current limitations
 
-* An image can be transformed up to a scale "n" if its dimensions are a multiple of 2^n.
+* For DWT, an image can be transformed up to a scale "n" if its dimensions are a multiple of 2^n. This limitation does not apply for SWT.
+* Only 2D data is handled for now. 1D and 3D should come in the future.
+* Only the periodic boundary extension is implemented.
+* The parallel part is implemented in CUDA, so only Nvidia GPUs can be used.
+* The computations are done on floating point 32 bits precision (float32), since most GPUs are not so efficient with double precision.
 
 
 ## Installation
@@ -34,7 +42,7 @@ You need the [NVIDIA CUDA Toolkit](https://developer.nvidia.com/cuda-toolkit), a
 The Makefile should build smoothly the example :
 
 ```bash
-make
+make demo
 ```
 
 
@@ -43,9 +51,9 @@ make
 ### Running the example
 
 To run the test, you need a raw image in 32 bits floating point precision format.
-As PPDWT was primarily written for being integrated in another project, the I/O issues were not addressed : the input and output of PPDWT are float arrays.
+As PDWT was primarily written for data crunching, the I/O part is not addressed : the input and output of PDWT are float arrays.
 
-If you have python and scipy installed, you can generate a sample file with
+If you have python and scipy installed, you can generate an image input file with
 
 ```bash
 python generate_lena.py [Nr] [Nc]
@@ -55,31 +63,38 @@ where Nr, Nc are optional arguments which are the number of rows/columns of the 
 You can then run an example with
 
 ```bash
-./wt
+make demo
+./demo
 ```
 
-and tune the wavelet, number of levels, etc. in the main() entry point.
+and tune the wavelet, number of levels, etc. in the prompt.
 
 
-### Calling PPDWT
+### Calling PDWT
 
 A typical usage would be the following :
 
 ```C
+#include "wt.h"
+
+// ...
 // float* img = ...
 int Nr = 1080; // number of rows of the image
 int Nc = 1280; // number of columns of the image
 int nlevels = 3;
 
 // Compute the wavelets coefficients with the "Daubechies 7" wavelet
-Wavelets W(img, Nr, Nc, "db7", nlevels, 1, 0);
+Wavelets W(img, Nr, Nc, "db7", nlevels);
+W.forward();
 
 // Do some thresholding on the wavelets coefficients
-printf("Before threshold : L1 = %e\n", W.norm1());
+float norm1 = W1.norm1();
+printf("Before threshold : L1 = %e\n", norm1);
 W.soft_threshold(10.0);
-printf("After threshold : L1 = %e\n", W.norm1());
+norm1 = W1.norm1();
+printf("After threshold : L1 = %e\n", norm1);
 
-// Inverse the DWT and retrieve the image
+// Inverse the DWT and retrieve the image from the GPU
 W.inverse();
 W.get_image(img);
 ```

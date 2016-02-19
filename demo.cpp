@@ -80,6 +80,63 @@ int main(int argc, char **argv) {
     nlevels = W.nlevels;
 
     // Perform forward WT with current configuration
+
+
+    // Example of custom filter (here: LeGall 9/7 lossy wavelet)
+    /*
+    int len = 10;
+    float* filter1, *filter2, *ifilter1, *ifilter2;
+    filter1 = (float*) calloc(len, sizeof(float));
+    filter2 = (float*) calloc(len, sizeof(float));
+    ifilter1 = (float*) calloc(len, sizeof(float));
+    ifilter2 = (float*) calloc(len, sizeof(float));
+
+    filter1[0] = 0.026748757411 ;
+    filter1[1] = -0.016864118443;
+    filter1[2] = -0.078223266529;
+    filter1[3] = 0.266864118443 ;
+    filter1[4] = 0.602949018236 ;
+    filter1[5] = 0.266864118443 ;
+    filter1[6] = -0.078223266529;
+    filter1[7] = -0.016864118443;
+    filter1[8] = 0.026748757411 ;
+
+    filter2[0] = 0              ;
+    filter2[1] = 0.091271763114 ;
+    filter2[2] = -0.057543526229;
+    filter2[3] = -0.591271763114;
+    filter2[4] =    1.11508705  ;
+    filter2[5] = -0.591271763114;
+    filter2[6] = -0.057543526229;
+    filter2[7] = 0.091271763114 ;
+    filter2[8] = 0              ;
+
+    ifilter1[0] = 0               ;
+    ifilter1[1] = -0.091271763114 ;
+    ifilter1[2] = -0.057543526229 ;
+    ifilter1[3] = 0.591271763114  ;
+    ifilter1[4] = 1.11508705      ;
+    ifilter1[5] = 0.591271763114  ;
+    ifilter1[6] = -0.057543526229 ;
+    ifilter1[7] = -0.091271763114 ;
+    ifilter1[8] = 0               ;
+
+    ifilter2[0] = 0.026748757411 ;
+    ifilter2[1] = 0.016864118443 ;
+    ifilter2[2] = -0.078223266529;
+    ifilter2[3] = -0.266864118443;
+    ifilter2[4] = 0.602949018236 ;
+    ifilter2[5] = -0.266864118443;
+    ifilter2[6] = -0.078223266529;
+    ifilter2[7] = 0.016864118443 ;
+    ifilter2[8] = 0.026748757411 ;
+
+    W.set_filters_forward(len, filter1, filter2);
+    W.set_filters_inverse(ifilter1, ifilter2);
+    */
+
+
+
     W.forward();
     puts("Forward OK");
 
@@ -114,6 +171,7 @@ int main(int argc, char **argv) {
     W.set_image(dummy, 0);
     W.inverse();
     * */
+
     W.inverse();
     puts("Inverse OK");
 

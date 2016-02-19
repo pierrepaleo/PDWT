@@ -60,7 +60,8 @@ class Wavelets {
     void print_informations();
     int get_coeff(float* coeff, int num);
     void set_image(float* img, int mem_is_on_device = 0);
-
+    int set_filters_forward(int len, float* filter1, float* filter2, float* filter3 = NULL, float* filter4 = NULL);
+    int set_filters_inverse(float* filter1, float* filter2, float* filter3 = NULL, float* filter4 = NULL);
 };
 
 
