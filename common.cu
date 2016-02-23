@@ -231,11 +231,38 @@ float** w_create_coeffs_buffer(int Nr, int Nc, int nlevels, int do_swt) {
     return res;
 }
 
+
+
+/// Creates an allocated/padded device array : [ An, D1, ..., Dn]
+float** w_create_coeffs_buffer_1d(int Nr, int Nc, int nlevels, int do_swt) {
+    int Nc0 = Nc;
+    if (!do_swt) Nc0 /= 2;
+    float** res = (float**) calloc(nlevels+1, sizeof(float*));
+    // Det coeffs
+    for (int i = 1; i < nlevels+1; i++) {
+        if (!do_swt) Nc /= 2;
+        cudaMalloc(&(res[i]), Nr*Nc*sizeof(float));
+        cudaMemset(res[i], 0, Nr*Nc*sizeof(float));
+    }
+    // App coeff (last scale). They are also useful as a temp. buffer for the reconstruction, hence a bigger size
+    cudaMalloc(&(res[0]), Nr*Nc0*sizeof(float));
+    cudaMemset(res[0], 0, Nr*Nc0*sizeof(float));
+    return res;
+}
+
+
+
 /// Deep free of wavelet coefficients
 void w_free_coeffs_buffer(float** coeffs, int nlevels) {
     for (int i = 0; i < 3*nlevels+1; i++) cudaFree(coeffs[i]);
     free(coeffs);
 }
+
+void w_free_coeffs_buffer_1d(float** coeffs, int nlevels) {
+    for (int i = 0; i < nlevels+1; i++) cudaFree(coeffs[i]);
+    free(coeffs);
+}
+
 
 /// Deep copy of wavelet coefficients. All structures must be allocated.
 void w_copy_coeffs_buffer(float** dst, float** src, int Nr, int Nc, int nlevels, int do_swt) {
@@ -254,4 +281,12 @@ void w_copy_coeffs_buffer(float** dst, float** src, int Nr, int Nc, int nlevels,
 }
 
 
-
+void w_copy_coeffs_buffer_1d(float** dst, float** src, int Nr, int Nc, int nlevels, int do_swt) {
+    // Det Coeffs
+    for (int i = 1; i < nlevels+1; i++) {
+        if (!do_swt) Nc /= 2;
+        cudaMemcpy(dst[i], src[i], Nr*Nc*sizeof(float), cudaMemcpyDeviceToDevice);
+    }
+    // App coeff (last scale)
+    cudaMemcpy(dst[0], src[0], Nr*Nc*sizeof(float), cudaMemcpyDeviceToDevice);
+}

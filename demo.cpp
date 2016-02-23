@@ -6,11 +6,11 @@
 
 
 ///
-/// This file shows how to use PPDWT with some examples.
+/// This file shows how to use PDWT with some examples.
 ///
 
 void print_examples() {
-    puts("---------------------- PPDWT examples ----------------------");
+    puts("---------------------- PDWT examples ----------------------");
     puts("1 \t Forward DWT");
     puts("2 \t Forward and inverse DWT, \"perfect reconstruction\"");
     puts("3 \t Forward DWT, threshold and inverse DWT");
@@ -75,7 +75,7 @@ int main(int argc, char **argv) {
     if (what == 0) return 0;
 
     // Create the wavelet
-    Wavelets W(img, Nr, Nc, wname, nlevels, 1, do_separable, do_cycle_spinning, do_swt);
+    Wavelets W(img, Nr, Nc, wname, nlevels, 1, do_separable, do_cycle_spinning, do_swt, 1);
     W.print_informations();
     nlevels = W.nlevels;
 
@@ -140,21 +140,11 @@ int main(int argc, char **argv) {
     W.forward();
     puts("Forward OK");
 
-    int nels, Nr2, Nc2;
-    if (W.do_swt) {
-        Nr2 = Nr;
-        Nc2 = Nc;
-    }
-    else {
-        Nr2 = (Nr >> nlevels);
-        Nc2 = (Nc >> nlevels);
-    }
-    nels = Nr2*Nc2;
-    float* thecoeffs = (float*) calloc(nels, sizeof(float));
-    W.get_coeff(thecoeffs, 0); //3*(nlevels-1)+3);
+    float* thecoeffs = (float*) calloc(Nr*Nc, sizeof(float)); // larger than needed
+    int nels = W.get_coeff(thecoeffs, 4); //3*(nlevels-1)+3);
     write_dat_file_float("res.dat", thecoeffs, nels);
     if (what == 1) {
-        printf("Approximation coefficients (%dx%d) are stored in res.dat\n", Nr2, Nc2);
+        printf("Approximation coefficients (level %d) are stored in res.dat\n", nlevels);
         return 0;
     }
 

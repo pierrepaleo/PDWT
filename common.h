@@ -37,6 +37,16 @@ void w_free_coeffs_buffer(float** coeffs, int nlevels);
 
 void w_copy_coeffs_buffer(float** dst, float** src, int Nr, int Nc, int nlevels, int do_swt);
 
+// ---
+
+float** w_create_coeffs_buffer_1d(int Nr, int Nc, int nlevels, int do_swt);
+void w_free_coeffs_buffer_1d(float** coeffs, int nlevels);
+void w_copy_coeffs_buffer_1d(float** dst, float** src, int Nr, int Nc, int nlevels, int do_swt);
+
+
+
+
+
 
 
 #endif

@@ -52,7 +52,8 @@ Wavelets& Wavelets::operator=(const Wavelets &rhs) {
     cudaMemcpy(new_image, rhs.d_image, sz, cudaMemcpyDeviceToDevice);
 
     new_coeffs =  w_create_coeffs_buffer(rhs.Nr, rhs.Nc, rhs.nlevels, rhs.do_swt);
-    w_copy_coeffs_buffer(new_coeffs, rhs.d_coeffs, rhs.Nr, rhs.Nc, rhs.nlevels, rhs.do_swt);
+    if (ndim == 2) w_copy_coeffs_buffer(new_coeffs, rhs.d_coeffs, rhs.Nr, rhs.Nc, rhs.nlevels, rhs.do_swt);
+    else  w_copy_coeffs_buffer_1d(new_coeffs, rhs.d_coeffs, rhs.Nr, rhs.Nc, rhs.nlevels, rhs.do_swt);
 
     cudaMalloc(&new_tmp, sz);
     cudaMemcpy(new_tmp, rhs.d_tmp, 2*sz, cudaMemcpyDeviceToDevice); // Two temp. images
@@ -97,7 +98,8 @@ Wavelets::Wavelets(
     int memisonhost,
     int do_separable,
     int do_cycle_spinning,
-    int do_swt) :
+    int do_swt,
+    int ndim) :
 
     d_image(NULL),
     Nr(Nr),
@@ -110,7 +112,8 @@ Wavelets::Wavelets(
     current_shift_c(0),
     do_swt(do_swt),
     do_separable(do_separable),
-    state(W_INIT)
+    state(W_INIT),
+    ndim(ndim)
 {
 
     if (nlevels < 1) {
@@ -135,7 +138,8 @@ Wavelets::Wavelets(
 
     // Coeffs
     float** d_coeffs_new;
-    d_coeffs_new = w_create_coeffs_buffer(Nr, Nc, nlevels, do_swt);
+    if (ndim == 2) d_coeffs_new = w_create_coeffs_buffer(Nr, Nc, nlevels, do_swt);
+    else d_coeffs_new = w_create_coeffs_buffer_1d(Nr, Nc, nlevels, do_swt);
     this->d_coeffs = d_coeffs_new;
 
     // Filters
@@ -164,7 +168,10 @@ Wavelets::Wavelets(
 /// Destructor
 Wavelets::~Wavelets(void) {
     if (d_image) cudaFree(d_image);
-    if (d_coeffs) w_free_coeffs_buffer(d_coeffs, nlevels);
+    if (d_coeffs) {
+        if (ndim == 2) w_free_coeffs_buffer(d_coeffs, nlevels);
+        else w_free_coeffs_buffer_1d(d_coeffs, nlevels);
+    }
     if (d_tmp) cudaFree(d_tmp);
 }
 
@@ -178,7 +185,8 @@ void Wavelets::forward(void) {
     if ((hlen == 2) && (!do_swt)) haar_forward2d(d_image, d_coeffs, d_tmp, Nr, Nc, nlevels);
     else {
         if (do_separable) {
-            if (!do_swt) w_forward_separable(d_image, d_coeffs, d_tmp, Nr, Nc, nlevels, hlen);
+            if (ndim == 1) w_forward_separable_1d(d_image, d_coeffs, d_tmp, Nr, Nc, nlevels, hlen);
+            else if (!do_swt) w_forward_separable(d_image, d_coeffs, d_tmp, Nr, Nc, nlevels, hlen);
             else w_forward_swt_separable(d_image, d_coeffs, d_tmp, Nr, Nc, nlevels, hlen);
         }
         else {
@@ -302,9 +310,15 @@ int Wavelets::get_coeff(float* coeff, int num) {
     }
     int Nr2 = Nr, Nc2 = Nc;
     if (!do_swt) {
-        int factor = ((num == 0) ? (w_ipow2(nlevels)) : (w_ipow2((num-1)/3 +1)));
-        Nr2 /= factor;
-        Nc2 /= factor;
+        if (ndim == 2) {
+            int factor = ((num == 0) ? (w_ipow2(nlevels)) : (w_ipow2((num-1)/3 +1)));
+            Nr2 /= factor;
+            Nc2 /= factor;
+        }
+        else { // (ndim == 1)
+            int factor = ((num == 0) ? (w_ipow2(nlevels)) : (w_ipow2((num-1) +1)));
+            Nc2 /= factor;
+        }
     }
     //~ printf("Retrieving %d (%d x %d)\n", num, Nr2, Nc2);
     cudaMemcpy(coeff, d_coeffs[num], Nr2*Nc2*sizeof(float), cudaMemcpyDeviceToHost);

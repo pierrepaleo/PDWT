@@ -30,13 +30,14 @@ class Wavelets {
     int do_swt; // 1 if performing undecimated WT
     int do_separable; // 1 if performing separable WT
     w_state state;
+    int ndim; // number of dimensions of the transform
 
     // Operations
     // -----------
     // Default constructor
     Wavelets();
     // Constructor : Wavelets from image
-    Wavelets(float* img, int Nr, int Nc, const char* wname, int levels, int memisonhost=1, int do_separable = 1, int do_cycle_spinning = 0, int do_swt = 0);
+    Wavelets(float* img, int Nr, int Nc, const char* wname, int levels, int memisonhost=1, int do_separable=1, int do_cycle_spinning=0, int do_swt=0, int ndim=2);
     // Constructor : Wavelets from coeffs
     //~ Wavelets(float** d_thecoeffs, int Nr, int Nc, const char* wname, int levels, int do_cycle_spinning);
     // Class copy (constructor)
