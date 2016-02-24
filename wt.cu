@@ -234,7 +234,7 @@ void Wavelets::inverse(void) {
         if ((hlen == 2) && (!do_swt)) ; //haar_inverse1d(d_image, d_coeffs, d_tmp, Nr, Nc, nlevels); // TODO !!
         else {
             if (!do_swt) w_inverse_separable_1d(d_image, d_coeffs, d_tmp, Nr, Nc, nlevels, hlen);
-            else ; //w_inverse_swt_separable_1d(d_image, d_coeffs, d_tmp, Nr, Nc, nlevels, hlen); // TODO !!
+            else w_inverse_swt_separable_1d(d_image, d_coeffs, d_tmp, Nr, Nc, nlevels, hlen);
         }
     }
     else if (ndim == 2) {
