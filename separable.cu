@@ -328,7 +328,7 @@ int w_inverse_separable(float* d_image, float** d_coeffs, float* d_tmp, int Nr, 
 }
 
 
-// (batched) 1D inverse transform. Boils down to 2D separable transform without the second pass.
+// (batched) 1D inverse transform. Boils down to 2D separable transform without the first pass.
 int w_inverse_separable_1d(float* d_image, float** d_coeffs, float* d_tmp, int Nr, int Nc, int levels, int hlen) {
     puts("inverting");
     float* d_tmp1 = d_coeffs[0];
@@ -456,14 +456,6 @@ __global__ void w_kern_forward_swt_pass2(float* tmp_a1, float* tmp_a2, float* c_
 
 int w_forward_swt_separable(float* d_image, float** d_coeffs, float* d_tmp, int Nr, int Nc, int levels, int hlen) {
 
-    //~ // DEBUG
-    //~ float* d_tmp1, *d_tmp2;
-    //~ cudaMalloc(&d_tmp1, Nr*Nc*sizeof(float));
-    //~ cudaMalloc(&d_tmp2, Nr*Nc*sizeof(float));
-    //~ puts("Performing forward SWT");
-    //~ // ----
-
-
     float* d_tmp1 = d_tmp;
     float* d_tmp2 = d_tmp + Nr*Nc;
 
@@ -481,6 +473,33 @@ int w_forward_swt_separable(float* d_image, float** d_coeffs, float* d_tmp, int 
     }
     return 0;
 }
+
+
+// (batched) 1D forward SWT. Boils down to 2D non-separable transform without the second pass.
+int w_forward_swt_separable_1d(float* d_image, float** d_coeffs, float* d_tmp, int Nr, int Nc, int levels, int hlen) {
+
+    puts("swt 1d");
+    float* d_tmp1 = d_coeffs[0];
+    float* d_tmp2 = d_tmp;
+
+    int tpb = 16; // TODO : tune for max perfs.
+    dim3 n_blocks = dim3(w_iDivUp(Nc, tpb), w_iDivUp(Nr, tpb), 1);
+    dim3 n_threads_per_block = dim3(tpb, tpb, 1);
+    // First level
+    w_kern_forward_swt_pass1<<<n_blocks, n_threads_per_block>>>(d_image, d_coeffs[0], d_coeffs[1], Nr, Nc, hlen, 1);
+    // Other levels
+    for (int i=1; i < levels; i++) {
+        w_kern_forward_swt_pass1<<<n_blocks, n_threads_per_block>>>(d_tmp1, d_tmp2, d_coeffs[i+1], Nr, Nc, hlen, i+1);
+        w_swap_ptr(&d_tmp1, &d_tmp2);
+    }
+    if ((levels & 1) == 0) cudaMemcpy(d_coeffs[0], d_tmp, Nr*Nc*sizeof(float), cudaMemcpyDeviceToDevice);
+    return 0;
+}
+
+
+
+
+
 
 
 

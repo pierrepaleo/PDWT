@@ -42,6 +42,8 @@
 
 
 /// Constructor : copy assignment
+// do not use !
+/*
 Wavelets& Wavelets::operator=(const Wavelets &rhs) {
   if (this != &rhs) { // protect against invalid self-assignment
     // allocate new memory and copy the elements
@@ -78,7 +80,7 @@ Wavelets& Wavelets::operator=(const Wavelets &rhs) {
   }
   return *this;
 }
-
+*/
 
 
 
@@ -138,10 +140,19 @@ Wavelets::Wavelets(
 
     // Coeffs
     float** d_coeffs_new;
-    if (ndim == 2) d_coeffs_new = w_create_coeffs_buffer(Nr, Nc, nlevels, do_swt);
-    else d_coeffs_new = w_create_coeffs_buffer_1d(Nr, Nc, nlevels, do_swt);
+    if (ndim == 1) d_coeffs_new = w_create_coeffs_buffer_1d(Nr, Nc, nlevels, do_swt);
+    else if (ndim == 2) d_coeffs_new = w_create_coeffs_buffer(Nr, Nc, nlevels, do_swt);
+    else {
+        printf("ERROR: ndim=%d is not implemented\n", ndim);
+        exit(1);
+    }
     this->d_coeffs = d_coeffs_new;
 
+    if (ndim == 1 && do_separable == 0) {
+        puts("Warning: requestred 1D DWT, which is incompatible with non-separable transform.");
+        puts("Forcing do_separable = 1");
+        do_separable = 1;
+    }
     // Filters
     strncpy(this->wname, wname, 128);
     int hlen = 0;
@@ -149,7 +160,7 @@ Wavelets::Wavelets(
     else hlen = w_compute_filters(wname, 1, do_swt);
     if (hlen == 0) {
         printf("ERROR: unknown wavelet name %s\n", wname);
-        exit(1); // FIXME : more graceful error
+        exit(1);
     }
     this->hlen = hlen;
 
@@ -157,11 +168,18 @@ Wavelets::Wavelets(
     int N = min(Nr, Nc);
     int wmaxlev = w_ilog2(N/hlen);
     if (levels > wmaxlev) {
-        printf("Warn: required level (%d) is greater than the maximum possible level for %s (%d).\n", nlevels, wname, wmaxlev);
+        printf("Warning: required level (%d) is greater than the maximum possible level for %s (%d).\n", nlevels, wname, wmaxlev);
         printf("Forcing nlevels = %d\n", wmaxlev);
         nlevels = wmaxlev;
     }
     if (do_cycle_spinning && do_swt) puts("Warning: makes little sense to use Cycle spinning with stationary Wavelet transform");
+    // TODO
+    if (do_cycle_spinning && ndim == 1) {
+        puts("ERROR: cycle spinning is not implemented for 1D. Use SWT instead.");
+        exit(1);
+    }
+
+
 }
 
 
@@ -182,18 +200,28 @@ void Wavelets::forward(void) {
         current_shift_c = rand() % Nc;
         circshift(current_shift_r, current_shift_c, 1);
     }
-    if ((hlen == 2) && (!do_swt)) haar_forward2d(d_image, d_coeffs, d_tmp, Nr, Nc, nlevels);
-    else {
-        if (do_separable) {
-            if (ndim == 1) w_forward_separable_1d(d_image, d_coeffs, d_tmp, Nr, Nc, nlevels, hlen);
-            else if (!do_swt) w_forward_separable(d_image, d_coeffs, d_tmp, Nr, Nc, nlevels, hlen);
-            else w_forward_swt_separable(d_image, d_coeffs, d_tmp, Nr, Nc, nlevels, hlen);
-        }
+    if (ndim == 1) {
+        if ((hlen == 2) && (!do_swt)) ; //haar_forward1d(d_image, d_coeffs, d_tmp, Nr, Nc, nlevels); // TODO !!
         else {
-            if (!do_swt) w_forward(d_image, d_coeffs, d_tmp, Nr, Nc, nlevels, hlen);
-            else w_forward_swt(d_image, d_coeffs, d_tmp, Nr, Nc, nlevels, hlen);
+            if (!do_swt) w_forward_separable_1d(d_image, d_coeffs, d_tmp, Nr, Nc, nlevels, hlen);
+            else ; w_forward_swt_separable_1d(d_image, d_coeffs, d_tmp, Nr, Nc, nlevels, hlen);
         }
     }
+    else if (ndim == 2) {
+        if ((hlen == 2) && (!do_swt)) haar_forward2d(d_image, d_coeffs, d_tmp, Nr, Nc, nlevels);
+        else {
+            if (do_separable) {
+                if (!do_swt) w_forward_separable(d_image, d_coeffs, d_tmp, Nr, Nc, nlevels, hlen);
+                else w_forward_swt_separable(d_image, d_coeffs, d_tmp, Nr, Nc, nlevels, hlen);
+            }
+            else {
+                if (!do_swt) w_forward(d_image, d_coeffs, d_tmp, Nr, Nc, nlevels, hlen);
+                else w_forward_swt(d_image, d_coeffs, d_tmp, Nr, Nc, nlevels, hlen);
+            }
+        }
+    }
+    // else: not implemented yet
+
     state = W_FORWARD;
 }
 /// Method : inverse
@@ -202,19 +230,28 @@ void Wavelets::inverse(void) {
         puts("Warning: W.inverse() has already been run. Inverse is available in W.get_image()");
         return;
     }
-    if ((hlen == 2) && (!do_swt)) haar_inverse2d(d_image, d_coeffs, d_tmp, Nr, Nc, nlevels);
-    else {
-        if (do_separable) {
-            if (ndim == 1) w_inverse_separable_1d(d_image, d_coeffs, d_tmp, Nr, Nc, nlevels, hlen);
-            else if (!do_swt) w_inverse_separable(d_image, d_coeffs, d_tmp, Nr, Nc, nlevels, hlen);
-            else w_inverse_swt_separable(d_image, d_coeffs, d_tmp, Nr, Nc, nlevels, hlen);
-        }
+    if (ndim == 1) {
+        if ((hlen == 2) && (!do_swt)) ; //haar_inverse1d(d_image, d_coeffs, d_tmp, Nr, Nc, nlevels); // TODO !!
         else {
-            w_compute_filters(wname, -1, do_swt); // TODO : dedicated inverse coeffs to avoid this computation ?
-            if (!do_swt) w_inverse(d_image, d_coeffs, d_tmp, Nr, Nc, nlevels, hlen);
-            else w_inverse_swt(d_image, d_coeffs, d_tmp, Nr, Nc, nlevels, hlen);
+            if (!do_swt) w_inverse_separable_1d(d_image, d_coeffs, d_tmp, Nr, Nc, nlevels, hlen);
+            else ; //w_inverse_swt_separable_1d(d_image, d_coeffs, d_tmp, Nr, Nc, nlevels, hlen); // TODO !!
         }
     }
+    else if (ndim == 2) {
+        if ((hlen == 2) && (!do_swt)) haar_inverse2d(d_image, d_coeffs, d_tmp, Nr, Nc, nlevels);
+        else {
+            if (do_separable) {
+                if (!do_swt) w_inverse_separable(d_image, d_coeffs, d_tmp, Nr, Nc, nlevels, hlen);
+                else w_inverse_swt_separable(d_image, d_coeffs, d_tmp, Nr, Nc, nlevels, hlen);
+            }
+            else {
+                w_compute_filters(wname, -1, do_swt); // TODO : dedicated inverse coeffs to avoid this computation ?
+                if (!do_swt) w_inverse(d_image, d_coeffs, d_tmp, Nr, Nc, nlevels, hlen);
+                else w_inverse_swt(d_image, d_coeffs, d_tmp, Nr, Nc, nlevels, hlen);
+            }
+        }
+    }
+    // else: not implemented yet
     if (do_cycle_spinning) circshift(-current_shift_r, -current_shift_c, 1);
     state = W_INVERSE;
 }

@@ -141,7 +141,7 @@ int main(int argc, char **argv) {
     puts("Forward OK");
 
     float* thecoeffs = (float*) calloc(Nr*Nc, sizeof(float)); // larger than needed
-    int nels = W.get_coeff(thecoeffs, 4); //3*(nlevels-1)+3);
+    int nels = W.get_coeff(thecoeffs, 3); //3*(nlevels-1)+3);
     write_dat_file_float("res.dat", thecoeffs, nels);
     if (what == 1) {
         printf("Approximation coefficients (level %d) are stored in res.dat\n", nlevels);

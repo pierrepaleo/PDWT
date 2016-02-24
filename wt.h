@@ -45,7 +45,8 @@ class Wavelets {
     // Destructor
     ~Wavelets();
     // Assignment (copy assignment constructor)
-    Wavelets& operator=(const Wavelets &rhs);
+    // do not use !
+    // Wavelets& operator=(const Wavelets &rhs);
 
     // Methods
     // -------
