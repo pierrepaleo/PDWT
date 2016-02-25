@@ -211,7 +211,7 @@ void Wavelets::forward(void) {
         if ((hlen == 2) && (!do_swt)) haar_forward1d(d_image, d_coeffs, d_tmp, Nr, Nc, nlevels);
         else {
             if (!do_swt) w_forward_separable_1d(d_image, d_coeffs, d_tmp, Nr, Nc, nlevels, hlen);
-            else ; w_forward_swt_separable_1d(d_image, d_coeffs, d_tmp, Nr, Nc, nlevels, hlen);
+            else w_forward_swt_separable_1d(d_image, d_coeffs, d_tmp, Nr, Nc, nlevels, hlen);
         }
     }
     else if (ndim == 2) {
@@ -404,9 +404,10 @@ void Wavelets::print_informations() {
     else {
         // SWT : size(output) = size(input)*4*levels
         // d_image (1), d_coeffs (3*levels+1), d_tmp (2)
-        mem_used = (3*nlevels+4)*Nr*Nc*sizeof(float);
+        if (ndim == 2) mem_used = (3*nlevels+4)*Nr*Nc*sizeof(float);
+        else mem_used = (nlevels+4)*Nr*Nc*sizeof(float);
     }
-    printf("Estimated memory footprint : %.1f MB\n", mem_used/1e6);
+    printf("Estimated memory footprint : %.2f MB\n", mem_used/1e6);
 
 
     int device;
