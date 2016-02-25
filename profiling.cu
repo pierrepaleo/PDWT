@@ -15,7 +15,7 @@ int main(int argc, char **argv) {
     float* img = read_dat_file_float("lena.dat", Nr*Nc);
 
     // Configure DWT
-    const char wname[128] = "db3"; //"haar";
+    const char wname[128] = "haar"; //"db3"; //"haar";
     int nlevels = 2; //4;
     int do_separable = 1;
     int do_swt = 0;
@@ -40,15 +40,6 @@ int main(int argc, char **argv) {
     printf("Forward WT (%d levels) took %lf ms\n", nlevels, elapsedTime);
 
 
-    int nels;
-    if (!(W.do_swt)) nels = (Nr >> nlevels) * (Nc >> nlevels);
-    else nels = Nr*Nc;
-    float* thecoeffs = (float*) calloc(nels, sizeof(float));
-    W.get_coeff(thecoeffs, 3*(nlevels-1)+3);
-    write_dat_file_float("res.dat", thecoeffs, nels);
-    //~ return 0;
-
-
 
     cudaEventRecord(tstart, 0);
     //---
@@ -56,6 +47,30 @@ int main(int argc, char **argv) {
     //---
     cudaEventRecord(tstop, 0); cudaEventSynchronize(tstop); cudaEventElapsedTime(&elapsedTime, tstart, tstop);
     printf("Soft thresh (%d levels) took %lf ms\n", nlevels, elapsedTime);
+
+
+
+    cudaEventRecord(tstart, 0);
+    //---
+    W.norm1();
+    //---
+    cudaEventRecord(tstop, 0); cudaEventSynchronize(tstop); cudaEventElapsedTime(&elapsedTime, tstart, tstop);
+    printf("norm1 (%d levels) took %lf ms\n", nlevels, elapsedTime);
+
+
+    /*
+    W.inverse();
+    W.set_image(img, 0);
+    W.forward();
+    W.soft_threshold(10.0);
+    cudaEventRecord(tstart, 0);
+    //---
+    W.norm2sq();
+    //---
+    cudaEventRecord(tstop, 0); cudaEventSynchronize(tstop); cudaEventElapsedTime(&elapsedTime, tstart, tstop);
+    printf("second call to norm1 (%d levels) took %lf ms\n", nlevels, elapsedTime);
+    */
+
 
 
     cudaMemset(W.d_image, 0, Nr*Nc*sizeof(float)); // To ensure that d_image is actually the result of W.inverse

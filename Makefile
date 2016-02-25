@@ -11,10 +11,6 @@ profiling: wt.o common.o io.o profiling.o
 	$(NVCC) -g -o $@ $^  $(CFLAGS) $(LDFLAGS)
 
 
-tests: tests.o io.o wt.o common.o
-	$(NVCC) -g -o $@ $^  $(CFLAGS) $(LDFLAGS)
-
-
 libppdwt.so: wt.cu common.cu
 	$(NVCC) --ptxas-options=-v --compiler-options '-fPIC' -o $@ --shared wt.cu common.cu $(CFLAGS) $(LDFLAGS)
 
