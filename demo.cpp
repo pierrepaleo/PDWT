@@ -75,7 +75,7 @@ int main(int argc, char **argv) {
     if (what == 0) return 0;
 
     // Create the wavelet
-    Wavelets W(img, Nr, Nc, wname, nlevels, 1, do_separable, do_cycle_spinning, do_swt, 1);
+    Wavelets W(img, Nr, Nc, wname, nlevels, 1, do_separable, do_cycle_spinning, do_swt);
     W.print_informations();
     nlevels = W.nlevels;
 
@@ -141,7 +141,7 @@ int main(int argc, char **argv) {
     puts("Forward OK");
 
     float* thecoeffs = (float*) calloc(Nr*Nc, sizeof(float)); // larger than needed
-    int nels = W.get_coeff(thecoeffs, 3); //3*(nlevels-1)+3);
+    int nels = W.get_coeff(thecoeffs, 0); //3*(nlevels-1)+3);
     write_dat_file_float("res.dat", thecoeffs, nels);
     if (what == 1) {
         printf("Approximation coefficients (level %d) are stored in res.dat\n", nlevels);
@@ -150,17 +150,15 @@ int main(int argc, char **argv) {
 
     if (what == 3) {
         printf("Before threshold : L1 = %e\n", W.norm1());
-        W.soft_threshold(490.0, 0);
+        W.soft_threshold(90.0, 0);
         printf("After threshold : L1 = %e\n", W.norm1());
     }
 
 
-    // Perform inverse WT with current configuration
-    /*
+    // Perform inverse WT with current configuration.
+    // Ensures that the result is actually the inverse
     float* dummy = (float*) calloc(Nr*Nc, sizeof(float));
     W.set_image(dummy, 0);
-    W.inverse();
-    * */
 
     W.inverse();
     puts("Inverse OK");

@@ -36,7 +36,7 @@ void w_swap_ptr(float** a, float** b) {
 
 
 
-
+/// soft thresholding of the detail coefficients (2D)
 /// Must be lanched with block size (Nc, Nr) : the size of the current coefficient vector
 __global__ void w_kern_soft_thresh(float* c_h, float* c_v, float* c_d, float beta, int Nr, int Nc) {
     int gidx = threadIdx.x + blockIdx.x*blockDim.x;
@@ -54,6 +54,21 @@ __global__ void w_kern_soft_thresh(float* c_h, float* c_v, float* c_d, float bet
     }
 }
 
+/// soft thresholding of the detail coefficients (1D)
+/// Must be lanched with block size (Nc, Nr) : the size of the current coefficient vector
+// CHECKME: consider merging this kernel with the previous kernel
+__global__ void w_kern_soft_thresh_1d(float* c_d, float beta, int Nr, int Nc) {
+    int gidx = threadIdx.x + blockIdx.x*blockDim.x;
+    int gidy = threadIdx.y + blockIdx.y*blockDim.y;
+    float val = 0.0f;
+    if (gidx < Nc && gidy < Nr) {
+        val = c_d[gidy*Nc + gidx];
+        c_d[gidy*Nc + gidx] = copysignf(max(fabsf(val)-beta, 0.0f), val);
+    }
+}
+
+/// soft thresholding of the approximation coefficients (2D and 1D)
+/// Must be lanched with block size (Nc, Nr) : the size of the current coefficient vector
 __global__ void w_kern_soft_thresh_appcoeffs(float* c_a, float beta, int Nr, int Nc) {
     int gidx = threadIdx.x + blockIdx.x*blockDim.x;
     int gidy = threadIdx.y + blockIdx.y*blockDim.y;
@@ -65,6 +80,8 @@ __global__ void w_kern_soft_thresh_appcoeffs(float* c_a, float beta, int Nr, int
 }
 
 
+
+/// Hard thresholding of the detail coefficients (2D)
 /// Must be lanched with block size (Nc, Nr) : the size of the current coefficient vector
 __global__ void w_kern_hard_thresh(float* c_h, float* c_v, float* c_d, float beta, int Nr, int Nc) {
     int gidx = threadIdx.x + blockIdx.x*blockDim.x;
@@ -82,6 +99,22 @@ __global__ void w_kern_hard_thresh(float* c_h, float* c_v, float* c_d, float bet
     }
 }
 
+
+/// Hard thresholding of the detail coefficients (1D)
+/// Must be lanched with block size (Nc, Nr) : the size of the current coefficient vector
+// CHECKME: consider merging this kernel with the previous kernel
+__global__ void w_kern_hard_thresh_1d(float* c_d, float beta, int Nr, int Nc) {
+    int gidx = threadIdx.x + blockIdx.x*blockDim.x;
+    int gidy = threadIdx.y + blockIdx.y*blockDim.y;
+    float val = 0.0f;
+    if (gidx < Nc && gidy < Nr) {
+        val = c_d[gidy*Nc + gidx];
+        c_d[gidy*Nc + gidx] = max(W_SIGN(fabsf(val)-beta), 0.0f)*val;
+    }
+}
+
+
+/// Hard thresholding of the approximation coefficients (2D and 1D)
 __global__ void w_kern_hard_thresh_appcoeffs(float* c_a, float beta, int Nr, int Nc) {
     int gidx = threadIdx.x + blockIdx.x*blockDim.x;
     int gidy = threadIdx.y + blockIdx.y*blockDim.y;
@@ -92,7 +125,7 @@ __global__ void w_kern_hard_thresh_appcoeffs(float* c_a, float beta, int Nr, int
     }
 }
 
-
+/// Circular shift of the image (2D and 1D)
 __global__ void w_kern_circshift(float* d_image, float* d_out, int Nr, int Nc, int sr, int sc) {
     int gidx = threadIdx.x + blockIdx.x*blockDim.x;
     int gidy = threadIdx.y + blockIdx.y*blockDim.y;
@@ -106,19 +139,17 @@ __global__ void w_kern_circshift(float* d_image, float* d_out, int Nr, int Nc, i
 
 
 
-
 /// ****************************************************************************
 /// ******************** Common CUDA Kernels calls *****************************
 /// ****************************************************************************
 
-
-void w_call_soft_thresh(float** d_coeffs, float beta, int Nr, int Nc, int nlevels, int do_swt, int do_thresh_appcoeffs) {
+void w_call_soft_thresh(float** d_coeffs, float beta, int Nr, int Nc, int nlevels, int do_swt, int do_thresh_appcoeffs, int ndim) {
     int tpb = 16; // Threads per block
     dim3 n_threads_per_block = dim3(tpb, tpb, 1);
     dim3 n_blocks;
     int Nr2 = Nr, Nc2 = Nc;
     if (!do_swt) {
-        Nr2 /= 2;
+        if (ndim > 1) Nr2 /= 2;
         Nc2 /= 2;
     }
     if (do_thresh_appcoeffs) {
@@ -127,22 +158,23 @@ void w_call_soft_thresh(float** d_coeffs, float beta, int Nr, int Nc, int nlevel
     }
     for (int i = 0; i < nlevels; i++) {
         if (!do_swt) {
-            Nr /= 2;
+            if (ndim > 1) Nr /= 2;
             Nc /= 2;
         }
         n_blocks = dim3(w_iDivUp(Nc, tpb), w_iDivUp(Nr, tpb), 1);
-        w_kern_soft_thresh<<<n_blocks, n_threads_per_block>>>(d_coeffs[3*i+1], d_coeffs[3*i+2], d_coeffs[3*i+3], beta, Nr, Nc);
+        if (ndim > 1) w_kern_soft_thresh<<<n_blocks, n_threads_per_block>>>(d_coeffs[3*i+1], d_coeffs[3*i+2], d_coeffs[3*i+3], beta, Nr, Nc);
+        else w_kern_soft_thresh_1d<<<n_blocks, n_threads_per_block>>>(d_coeffs[i+1], beta, Nr, Nc);
     }
 }
 
 
-void w_call_hard_thresh(float** d_coeffs, float beta, int Nr, int Nc, int nlevels, int do_swt, int do_thresh_appcoeffs) {
+void w_call_hard_thresh(float** d_coeffs, float beta, int Nr, int Nc, int nlevels, int do_swt, int do_thresh_appcoeffs, int ndim) {
     int tpb = 16; // Threads per block
     dim3 n_threads_per_block = dim3(tpb, tpb, 1);
     dim3 n_blocks;
     int Nr2 = Nr, Nc2 = Nc;
     if (!do_swt) {
-        Nr2 /= 2;
+        if (ndim > 1) Nr2 /= 2;
         Nc2 /= 2;
     }
     if (do_thresh_appcoeffs) {
@@ -151,19 +183,20 @@ void w_call_hard_thresh(float** d_coeffs, float beta, int Nr, int Nc, int nlevel
     }
     for (int i = 0; i < nlevels; i++) {
         if (!do_swt) {
-            Nr /= 2;
+            if (ndim > 1) Nr /= 2;
             Nc /= 2;
         }
         n_blocks = dim3(w_iDivUp(Nc, tpb), w_iDivUp(Nr, tpb), 1);
-        w_kern_hard_thresh<<<n_blocks, n_threads_per_block>>>(d_coeffs[3*i+1], d_coeffs[3*i+2], d_coeffs[3*i+3], beta, Nr, Nc);
+        if (ndim > 1) w_kern_hard_thresh<<<n_blocks, n_threads_per_block>>>(d_coeffs[3*i+1], d_coeffs[3*i+2], d_coeffs[3*i+3], beta, Nr, Nc);
+        else w_kern_hard_thresh_1d<<<n_blocks, n_threads_per_block>>>(d_coeffs[i+1], beta, Nr, Nc);
     }
 }
 
 
-void w_shrink(float** d_coeffs, float beta, int Nr, int Nc, int nlevels, int do_swt, int do_thresh_appcoeffs) {
+void w_shrink(float** d_coeffs, float beta, int Nr, int Nc, int nlevels, int do_swt, int do_thresh_appcoeffs, int ndim) {
     int Nr2 = Nr, Nc2 = Nc;
     if (!do_swt) {
-        Nr2 /= 2;
+        if (ndim > 1) Nr2 /= 2;
         Nc2 /= 2;
     }
     if (do_thresh_appcoeffs) {
@@ -171,12 +204,17 @@ void w_shrink(float** d_coeffs, float beta, int Nr, int Nc, int nlevels, int do_
     }
     for (int i = 0; i < nlevels; i++) {
         if (!do_swt) {
-            Nr /= 2;
+            if (ndim > 1) Nr /= 2;
             Nc /= 2;
         }
-        cublasSscal(Nr*Nc, 1.0f/(1.0f + beta), d_coeffs[3*i+1], 1);
-        cublasSscal(Nr*Nc, 1.0f/(1.0f + beta), d_coeffs[3*i+2], 1);
-        cublasSscal(Nr*Nc, 1.0f/(1.0f + beta), d_coeffs[3*i+3], 1);
+        if (ndim == 2) {
+            cublasSscal(Nr*Nc, 1.0f/(1.0f + beta), d_coeffs[3*i+1], 1);
+            cublasSscal(Nr*Nc, 1.0f/(1.0f + beta), d_coeffs[3*i+2], 1);
+            cublasSscal(Nr*Nc, 1.0f/(1.0f + beta), d_coeffs[3*i+3], 1);
+        }
+        else { // 1D
+            cublasSscal(Nr*Nc, 1.0f/(1.0f + beta), d_coeffs[i+1], 1);
+        }
     }
 }
 
@@ -185,13 +223,14 @@ void w_shrink(float** d_coeffs, float beta, int Nr, int Nc, int nlevels, int do_
 
 
 // if inplace = 1, the result is in "d_image" ; otherwise result is in "d_image2".
-void w_call_circshift(float* d_image, float* d_image2, int Nr, int Nc, int sr, int sc, int inplace /*= 1*/) {
+void w_call_circshift(float* d_image, float* d_image2, int Nr, int Nc, int sr, int sc, int inplace, int ndim) {
     // Modulus in C can be negative
     if (sr < 0) sr += Nr; // or do while loops to ensure positive numbers
     if (sc < 0) sc += Nc;
     int tpb = 16; // Threads per block
     sr = sr % Nr;
     sc = sc % Nc;
+    if (ndim == 1) sr = 0;
     dim3 n_blocks = dim3(w_iDivUp(Nc, tpb), w_iDivUp(Nr, tpb), 1);
     dim3 n_threads_per_block = dim3(tpb, tpb, 1);
     if (inplace) {

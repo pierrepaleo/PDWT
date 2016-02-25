@@ -262,7 +262,7 @@ void Wavelets::soft_threshold(float beta, int do_thresh_appcoeffs) {
         puts("Warning: Wavelets(): cannot threshold coefficients, as they were modified by W.inverse()");
         return;
     }
-    w_call_soft_thresh(d_coeffs, beta, Nr, Nc, nlevels, do_swt, do_thresh_appcoeffs);
+    w_call_soft_thresh(d_coeffs, beta, Nr, Nc, nlevels, do_swt, do_thresh_appcoeffs, ndim);
 }
 
 /// Method : hard thresholding
@@ -271,7 +271,7 @@ void Wavelets::hard_threshold(float beta, int do_thresh_appcoeffs) {
         puts("Warning: Wavelets(): cannot threshold coefficients, as they were modified by W.inverse()");
         return;
     }
-    w_call_hard_thresh(d_coeffs, beta, Nr, Nc, nlevels, do_swt, do_thresh_appcoeffs);
+    w_call_hard_thresh(d_coeffs, beta, Nr, Nc, nlevels, do_swt, do_thresh_appcoeffs, ndim);
 }
 
 /// Method : shrink (L2 proximal)
@@ -280,7 +280,7 @@ void Wavelets::shrink(float beta, int do_thresh_appcoeffs) {
         puts("Warning: Wavelets(): cannot threshold coefficients, as they were modified by W.inverse()");
         return;
     }
-    w_shrink(d_coeffs, beta, Nr, Nc, nlevels, do_swt, do_thresh_appcoeffs);
+    w_shrink(d_coeffs, beta, Nr, Nc, nlevels, do_swt, do_thresh_appcoeffs, ndim);
 }
 
 
@@ -288,7 +288,7 @@ void Wavelets::shrink(float beta, int do_thresh_appcoeffs) {
 /// Method : circular shift
 // If inplace = 1, the result is in d_image ; otherwise result is in d_tmp.
 void Wavelets::circshift(int sr, int sc, int inplace) {
-    w_call_circshift(d_image, d_tmp, Nr, Nc, sr, sc, inplace);
+    w_call_circshift(d_image, d_tmp, Nr, Nc, sr, sc, inplace, ndim);
 }
 /// Method : squared L2 norm
 float Wavelets::norm2sq(void) {
@@ -310,16 +310,22 @@ float Wavelets::norm2sq(void) {
 /// Method : L1 norm
 float Wavelets::norm1(void) {
     float res = 0.0f;
-    int Nr2, Nc2;
-    if (!do_swt) { Nr2 = Nr/2; Nc2 = Nc/2; }
-    else { Nr2 = Nr; Nc2 = Nc; }
+    int Nr2 = Nr, Nc2 = Nc;
+    if (!do_swt) { if (ndim > 1) Nr2 = Nr/2; Nc2 = Nc/2; }
     for (int i = 0; i < nlevels; i++) {
-        res += cublasSasum(Nr2*Nc2, d_coeffs[3*i+1], 1);
-        res += cublasSasum(Nr2*Nc2, d_coeffs[3*i+2], 1);
-        res += cublasSasum(Nr2*Nc2, d_coeffs[3*i+3], 1);
-        if (!do_swt) { Nr2 /= 2; Nc2 /= 2; }
+        if (ndim == 2) { // 2D
+            res += cublasSasum(Nr2*Nc2, d_coeffs[3*i+1], 1);
+            res += cublasSasum(Nr2*Nc2, d_coeffs[3*i+2], 1);
+            res += cublasSasum(Nr2*Nc2, d_coeffs[3*i+3], 1);
+        }
+        else { // 1D
+            res += cublasSasum(Nr2*Nc2, d_coeffs[i+1], 1);
+        }
+        if (!do_swt) { if (ndim > 1) Nr2 /= 2; Nc2 /= 2; }
     }
-    int nels = ((do_swt) ? (Nr2*Nc2) : (Nr2*Nc2*4));
+    int nels;
+    if (ndim == 2) nels = ((do_swt) ? (Nr2*Nc2) : (Nr2*Nc2*4));
+    else nels = ((do_swt) ? (Nr2*Nc2) : (Nr2*Nc2*2));
     res += cublasSasum(nels, d_coeffs[0], 1);
     return res;
 }
