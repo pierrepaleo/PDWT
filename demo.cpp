@@ -51,7 +51,7 @@ int main(int argc, char **argv) {
     int Nr = 512, Nc = 512;
     float* img = read_dat_file_float("lena.dat", Nr*Nc);
     if (img == NULL) exit(1);
-
+    //~ Nr = 1; // uncomment for 1D transform
     int what = 0;
     char wname[128];
     int nlevels,do_separable = 1, do_swt = 0;
@@ -78,9 +78,6 @@ int main(int argc, char **argv) {
     Wavelets W(img, Nr, Nc, wname, nlevels, 1, do_separable, do_cycle_spinning, do_swt);
     W.print_informations();
     nlevels = W.nlevels;
-
-    // Perform forward WT with current configuration
-
 
     // Example of custom filter (here: LeGall 9/7 lossy wavelet)
     /*
@@ -136,7 +133,7 @@ int main(int argc, char **argv) {
     */
 
 
-
+    // Perform forward WT with current configuration
     W.forward();
     puts("Forward OK");
 

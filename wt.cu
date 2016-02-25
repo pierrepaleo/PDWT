@@ -138,6 +138,12 @@ Wavelets::Wavelets(
     cudaMalloc(&d_tmp_new, 2*Nr*Nc*sizeof(float)); // Two temp. images
     this->d_tmp = d_tmp_new;
 
+    // Dimensions
+    if (Nr == 1) { // detect 1D data
+        ndim = 1;
+        this->ndim = 1;
+    }
+
     // Coeffs
     float** d_coeffs_new;
     if (ndim == 1) d_coeffs_new = w_create_coeffs_buffer_1d(Nr, Nc, nlevels, do_swt);
@@ -180,7 +186,6 @@ Wavelets::Wavelets(
         puts("ERROR: cycle spinning is not implemented for 1D. Use SWT instead.");
         exit(1);
     }
-
 
 }
 
@@ -378,6 +383,12 @@ void Wavelets::print_informations() {
 
     const char* state[2] = {"no", "yes"};
     puts("------------- Wavelet transform infos ------------");
+    printf("Data dimensions : ");
+    if (ndim == 2) printf("(%d, %d)\n", Nr, Nc);
+    else { // 1D
+        if (Nr == 1) printf("%d\n", Nc);
+        else printf("(%d, %d) [batched 1D transform]\n", Nr, Nc);
+    }
     printf("Wavelet name : %s\n", wname);
     printf("Number of levels : %d\n", nlevels);
     printf("Stationary WT : %s\n", state[do_swt]);
