@@ -201,7 +201,7 @@ void Wavelets::forward(void) {
         circshift(current_shift_r, current_shift_c, 1);
     }
     if (ndim == 1) {
-        if ((hlen == 2) && (!do_swt)) ; //haar_forward1d(d_image, d_coeffs, d_tmp, Nr, Nc, nlevels); // TODO !!
+        if ((hlen == 2) && (!do_swt)) haar_forward1d(d_image, d_coeffs, d_tmp, Nr, Nc, nlevels);
         else {
             if (!do_swt) w_forward_separable_1d(d_image, d_coeffs, d_tmp, Nr, Nc, nlevels, hlen);
             else ; w_forward_swt_separable_1d(d_image, d_coeffs, d_tmp, Nr, Nc, nlevels, hlen);
@@ -231,7 +231,7 @@ void Wavelets::inverse(void) {
         return;
     }
     if (ndim == 1) {
-        if ((hlen == 2) && (!do_swt)) ; //haar_inverse1d(d_image, d_coeffs, d_tmp, Nr, Nc, nlevels); // TODO !!
+        if ((hlen == 2) && (!do_swt)) haar_inverse1d(d_image, d_coeffs, d_tmp, Nr, Nc, nlevels);
         else {
             if (!do_swt) w_inverse_separable_1d(d_image, d_coeffs, d_tmp, Nr, Nc, nlevels, hlen);
             else w_inverse_swt_separable_1d(d_image, d_coeffs, d_tmp, Nr, Nc, nlevels, hlen);
