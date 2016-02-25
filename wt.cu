@@ -187,8 +187,6 @@ Wavelets::Wavelets(
         exit(1);
     }
 
-    // Warm-up CUBLAS
-    cublasSasum(Nr*Nc/4, d_coeffs[0], 1);
 }
 
 
