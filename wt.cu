@@ -303,14 +303,19 @@ float Wavelets::norm2sq(void) {
     int Nr2, Nc2;
     if (!do_swt) { Nr2 = Nr/2; Nc2 = Nc/2; }
     else { Nr2 = Nr; Nc2 = Nc; }
+    float tmp = 0;
     for (int i = 0; i < nlevels; i++) {
-        res += cublasSnrm2(Nr2*Nc2, d_coeffs[3*i+1], 1);
-        res += cublasSnrm2(Nr2*Nc2, d_coeffs[3*i+2], 1);
-        res += cublasSnrm2(Nr2*Nc2, d_coeffs[3*i+3], 1);
+        tmp = cublasSnrm2(Nr2*Nc2, d_coeffs[3*i+1], 1);
+        res += tmp*tmp;
+        tmp =cublasSnrm2(Nr2*Nc2, d_coeffs[3*i+2], 1);
+        res += tmp*tmp;
+        tmp = cublasSnrm2(Nr2*Nc2, d_coeffs[3*i+3], 1);
+        res += tmp*tmp;
         if (!do_swt) { Nr2 /= 2; Nc2 /= 2; }
     }
     int nels = ((do_swt) ? (Nr2*Nc2) : (Nr2*Nc2*4));
-    res += cublasSnrm2(nels, d_coeffs[0], 1);
+    tmp = cublasSnrm2(nels, d_coeffs[0], 1);
+    res += tmp*tmp;
     return res;
 }
 
