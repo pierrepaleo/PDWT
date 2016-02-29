@@ -579,7 +579,10 @@ int Wavelets::add_wavelet(Wavelets W, float alpha) {
 
 
 
-
+Wavelets external_copy(Wavelets W) {
+    Wavelets W_new(W);
+    return W_new;
+}
 
 
 
