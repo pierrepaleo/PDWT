@@ -47,6 +47,18 @@ __global__ void w_kern_hard_thresh_1d(float* c_d, float beta, int Nr, int Nc);
 __global__ void w_kern_soft_thresh_1d(float* c_d, float beta, int Nr, int Nc);
 
 
+// ---
+
+void w_add_coeffs(float** dst, float** src, int Nr, int Nc, int nlevels, int do_swt, float alpha=1.0f);
+void w_add_coeffs_1d(float** dst, float** src, int Nr, int Nc, int nlevels, int do_swt, float alpha=1.0f);
+
+
+
+
+
+
+
+
 
 
 #endif

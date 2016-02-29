@@ -329,3 +329,55 @@ void w_copy_coeffs_buffer_1d(float** dst, float** src, int Nr, int Nc, int nleve
     // App coeff (last scale)
     cudaMemcpy(dst[0], src[0], Nr*Nc*sizeof(float), cudaMemcpyDeviceToDevice);
 }
+
+
+
+///
+/// ----------------------------------------------------------------------------
+///
+
+
+
+
+void w_add_coeffs(float** dst, float** src, int Nr, int Nc, int nlevels, int do_swt, float alpha) {
+    // Coeffs (H, V, D)
+    for (int i = 1; i < 3*nlevels+1; i += 3) {
+        if (!do_swt) {
+            Nr /= 2;
+            Nc /= 2;
+        }
+        cublasSaxpy(Nr*Nc, alpha, src[i], 1, dst[i], 1);
+        cublasSaxpy(Nr*Nc, alpha, src[i+1], 1, dst[i+1], 1);
+        cublasSaxpy(Nr*Nc, alpha, src[i+2], 1, dst[i+2], 1);
+    }
+    // App coeff (last scale)
+    cublasSaxpy(Nr*Nc, alpha, src[0], 1, dst[0], 1);
+}
+
+
+void w_add_coeffs_1d(float** dst, float** src, int Nr, int Nc, int nlevels, int do_swt, float alpha) {
+    // Det Coeffs
+    for (int i = 1; i < nlevels+1; i++) {
+        if (!do_swt) Nc /= 2;
+        cublasSaxpy(Nr*Nc, alpha, src[i], 1, dst[i], 1);
+    }
+    // App coeff (last scale)
+    cublasSaxpy(Nr*Nc, alpha, src[0], 1, dst[0], 1);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

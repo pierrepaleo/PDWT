@@ -190,6 +190,44 @@ Wavelets::Wavelets(
 }
 
 
+
+
+/// Constructor: copy
+Wavelets::Wavelets(const Wavelets &W) :
+    Nr(W.Nr),
+    Nc(W.Nc),
+    nlevels(W.nlevels),
+    do_cycle_spinning(W.do_cycle_spinning),
+    current_shift_c(W.current_shift_c),
+    current_shift_r(W.current_shift_r),
+    hlen(W.hlen),
+    do_swt(W.do_swt),
+    do_separable(W.do_separable),
+    state(W.state),
+    ndim(W.ndim)
+{
+
+    strncpy(wname, W.wname, 128);
+    cudaMalloc(&d_image, Nr*Nc*sizeof(float));
+    cudaMemcpy(d_image, W.d_image, Nr*Nc*sizeof(float), cudaMemcpyDeviceToDevice);
+    cudaMalloc(&d_tmp, 2*Nr*Nc*sizeof(float));
+    //~ cudaMemcpy(d_tmp, W.d_tmp, 2*Nr*Nc*sizeof(float), cudaMemcpyDeviceToDevice); // not required
+
+    if (ndim == 1) {
+        d_coeffs = w_create_coeffs_buffer_1d(Nr, Nc, nlevels, do_swt);
+        w_copy_coeffs_buffer_1d(d_coeffs, W.d_coeffs, Nr, Nc, nlevels, do_swt);
+    }
+    else if (ndim == 2) {
+        d_coeffs = w_create_coeffs_buffer(Nr, Nc, nlevels, do_swt);
+        w_copy_coeffs_buffer(d_coeffs, W.d_coeffs, Nr, Nc, nlevels, do_swt);
+    }
+    else {
+        puts("ERROR: 3D wavelets not implemented yet");
+        exit(-1);
+    }
+}
+
+
 /// Destructor
 Wavelets::~Wavelets(void) {
     if (d_image) cudaFree(d_image);
@@ -473,6 +511,76 @@ int Wavelets::set_filters_inverse(float* filter1, float* filter2, float* filter3
     }
     return 0;
 }
+
+
+
+
+/// ----------------------------------------------------------------------------
+/// --------- Operators... for now I am not considering overloading  -----------
+/// ----------------------------------------------------------------------------
+
+
+/**
+ * \brief In-place addition of wavelets coefficients
+ *
+ *  For a given instance "Wav" of the class Wavelets, it performs
+ *   Wav += W. Only the wavelets coefficients are added, the image attribute
+ *  is not replaced
+ *
+ *
+ * \param W : Wavelets class instance
+ * \return 0 if no error
+ *
+ */
+int Wavelets::add_wavelet(Wavelets W, float alpha) {
+
+    // Various checks
+    if ((this->nlevels != W.nlevels) || (strcasecmp(this->wname, W.wname))) {
+        puts("ERROR: add_wavelet(): right operand is not the same transform (wname, level)");
+        return -1;
+    }
+    if (this->state == W_INVERSE || W.state == W_INVERSE) {
+        puts("WARNING: add_wavelet(): this operation makes no sense when wavelet has just been inverted");
+        return 1;
+    }
+    if (this->Nr != W.Nr || this->Nc != W.Nc || this->ndim != W.ndim) {
+        puts("ERROR: add_wavelet(): operands do not have the same geometry");
+        return -2;
+    }
+    if ((this->do_swt) ^ (W.do_swt)) {
+        puts("ERROR: add_wavelet(): operands should both use SWT or DWT");
+        return -3;
+    }
+    if (
+        (this->do_cycle_spinning * W.do_cycle_spinning)
+        && (
+            (this->current_shift_r != W.current_shift_r) || (this->current_shift_c != W.current_shift_c)
+           )
+       )
+    {
+        puts("ERROR: add_wavelet(): operands do not have the same current shift");
+        return -4;
+    }
+
+    // -----
+
+    if (this->ndim == 1) w_add_coeffs_1d(this->d_coeffs, W.d_coeffs, this->Nr, this->Nc, this->nlevels, this->do_swt, alpha);
+    else w_add_coeffs(this->d_coeffs, W.d_coeffs, this->Nr, this->Nc, this->nlevels, this->do_swt, alpha);
+
+
+
+
+
+    return 0;
+}
+
+
+
+
+
+
+
+
 
 
 

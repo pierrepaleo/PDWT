@@ -38,10 +38,10 @@ class Wavelets {
     Wavelets();
     // Constructor : Wavelets from image
     Wavelets(float* img, int Nr, int Nc, const char* wname, int levels, int memisonhost=1, int do_separable=1, int do_cycle_spinning=0, int do_swt=0, int ndim=2);
+    // Constructor: copy
+    Wavelets(const Wavelets &W);// Pass by non-const reference ONLY if the function will modify the parameter and it is the intent to change the caller's copy of the data
     // Constructor : Wavelets from coeffs
     //~ Wavelets(float** d_thecoeffs, int Nr, int Nc, const char* wname, int levels, int do_cycle_spinning);
-    // Class copy (constructor)
-    Wavelets(const Wavelets &W);  // Pass by non-const reference ONLY if the function will modify the parameter and it is the intent to change the caller's copy of the data
     // Destructor
     ~Wavelets();
     // Assignment (copy assignment constructor)
@@ -64,6 +64,8 @@ class Wavelets {
     void set_image(float* img, int mem_is_on_device = 0);
     int set_filters_forward(int len, float* filter1, float* filter2, float* filter3 = NULL, float* filter4 = NULL);
     int set_filters_inverse(float* filter1, float* filter2, float* filter3 = NULL, float* filter4 = NULL);
+
+    int add_wavelet(Wavelets W, float alpha=1.0f);
 };
 
 
