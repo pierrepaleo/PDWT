@@ -69,7 +69,5 @@ class Wavelets {
 };
 
 
-Wavelets external_copy(Wavelets W);
-
 #endif
 
