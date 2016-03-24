@@ -396,6 +396,31 @@ void Wavelets::set_image(float* img, int mem_is_on_device) { // There are no mem
 }
 
 
+/// Method : set a coefficient
+void Wavelets::set_coeff(float* coeff, int num, int mem_is_on_device) { // There are no memory check !
+    cudaMemcpyKind copykind;
+    if (mem_is_on_device) copykind = cudaMemcpyDeviceToDevice;
+    else copykind = cudaMemcpyHostToDevice;
+    int Nr2 = Nr, Nc2 = Nc;
+    if (!do_swt) {
+        if (ndim == 2) {
+            int factor = ((num == 0) ? (w_ipow2(nlevels)) : (w_ipow2((num-1)/3 +1)));
+            Nr2 /= factor;
+            Nc2 /= factor;
+        }
+        else { // (ndim == 1)
+            int factor = ((num == 0) ? (w_ipow2(nlevels)) : (w_ipow2((num-1) +1)));
+            Nc2 /= factor;
+        }
+    }
+    cudaMemcpy(d_coeffs[num], coeff, Nr2*Nc2*sizeof(float), copykind);
+    //~ state = W_FORWARD; // ?
+}
+
+
+
+
+
 /// Method : get a coefficient vector from device
 int Wavelets::get_coeff(float* coeff, int num) {
     if (state == W_INVERSE) {
