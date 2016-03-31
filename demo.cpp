@@ -147,7 +147,7 @@ int main(int argc, char **argv) {
 
     if (what == 3) {
         printf("Before threshold : L1 = %e\n", W.norm1());
-        W.soft_threshold(90.0, 0);
+        W.soft_threshold(90.0, 0, 0);
         printf("After threshold : L1 = %e\n", W.norm1());
     }
 

@@ -3,7 +3,8 @@
 /// ****************************************************************************
 
 #include "common.h"
-# define W_SIGN(a) ((a > 0) ? (1.0f) : (-1.0f))
+#define W_SIGN(a) ((a > 0) ? (1.0f) : (-1.0f))
+#define SQRT_2 1.4142135623730951
 #include <cublas.h>
 
 
@@ -143,7 +144,7 @@ __global__ void w_kern_circshift(float* d_image, float* d_out, int Nr, int Nc, i
 /// ******************** Common CUDA Kernels calls *****************************
 /// ****************************************************************************
 
-void w_call_soft_thresh(float** d_coeffs, float beta, int Nr, int Nc, int nlevels, int do_swt, int do_thresh_appcoeffs, int ndim) {
+void w_call_soft_thresh(float** d_coeffs, float beta, int Nr, int Nc, int nlevels, int do_swt, int do_thresh_appcoeffs, int normalize, int ndim) {
     int tpb = 16; // Threads per block
     dim3 n_threads_per_block = dim3(tpb, tpb, 1);
     dim3 n_blocks;
@@ -153,14 +154,21 @@ void w_call_soft_thresh(float** d_coeffs, float beta, int Nr, int Nc, int nlevel
         Nc2 /= 2;
     }
     if (do_thresh_appcoeffs) {
+        float beta2 = beta;
+        if (normalize > 0) { // beta2 = beta/sqrt(2)^nlevels
+            int nlevels2 = nlevels/2;
+            beta2 /= (1 << nlevels2);
+            if (nlevels2 *2 != nlevels) beta2 /= SQRT_2;
+        }
         n_blocks = dim3(w_iDivUp(Nc2, tpb), w_iDivUp(Nr2, tpb), 1);
-        w_kern_soft_thresh_appcoeffs<<<n_blocks, n_threads_per_block>>>(d_coeffs[0], beta, Nr2, Nc2);
+        w_kern_soft_thresh_appcoeffs<<<n_blocks, n_threads_per_block>>>(d_coeffs[0], beta2, Nr2, Nc2);
     }
     for (int i = 0; i < nlevels; i++) {
         if (!do_swt) {
             if (ndim > 1) Nr /= 2;
             Nc /= 2;
         }
+        if (normalize > 0) beta /= SQRT_2;
         n_blocks = dim3(w_iDivUp(Nc, tpb), w_iDivUp(Nr, tpb), 1);
         if (ndim > 1) w_kern_soft_thresh<<<n_blocks, n_threads_per_block>>>(d_coeffs[3*i+1], d_coeffs[3*i+2], d_coeffs[3*i+3], beta, Nr, Nc);
         else w_kern_soft_thresh_1d<<<n_blocks, n_threads_per_block>>>(d_coeffs[i+1], beta, Nr, Nc);
@@ -168,7 +176,7 @@ void w_call_soft_thresh(float** d_coeffs, float beta, int Nr, int Nc, int nlevel
 }
 
 
-void w_call_hard_thresh(float** d_coeffs, float beta, int Nr, int Nc, int nlevels, int do_swt, int do_thresh_appcoeffs, int ndim) {
+void w_call_hard_thresh(float** d_coeffs, float beta, int Nr, int Nc, int nlevels, int do_swt, int do_thresh_appcoeffs, int normalize, int ndim) {
     int tpb = 16; // Threads per block
     dim3 n_threads_per_block = dim3(tpb, tpb, 1);
     dim3 n_blocks;
@@ -177,7 +185,13 @@ void w_call_hard_thresh(float** d_coeffs, float beta, int Nr, int Nc, int nlevel
         if (ndim > 1) Nr2 /= 2;
         Nc2 /= 2;
     }
+    float beta2 = beta;
     if (do_thresh_appcoeffs) {
+        if (normalize > 0) { // beta2 = beta/sqrt(2)^nlevels
+            int nlevels2 = nlevels/2;
+            beta2 /= (1 << nlevels2);
+            if (nlevels2 *2 != nlevels) beta2 /= SQRT_2;
+        }
         n_blocks = dim3(w_iDivUp(Nc2, tpb), w_iDivUp(Nr2, tpb), 1);
         w_kern_hard_thresh_appcoeffs<<<n_blocks, n_threads_per_block>>>(d_coeffs[0], beta, Nr2, Nc2);
     }
@@ -186,6 +200,7 @@ void w_call_hard_thresh(float** d_coeffs, float beta, int Nr, int Nc, int nlevel
             if (ndim > 1) Nr /= 2;
             Nc /= 2;
         }
+        if (normalize > 0) beta /= SQRT_2;
         n_blocks = dim3(w_iDivUp(Nc, tpb), w_iDivUp(Nr, tpb), 1);
         if (ndim > 1) w_kern_hard_thresh<<<n_blocks, n_threads_per_block>>>(d_coeffs[3*i+1], d_coeffs[3*i+2], d_coeffs[3*i+3], beta, Nr, Nc);
         else w_kern_hard_thresh_1d<<<n_blocks, n_threads_per_block>>>(d_coeffs[i+1], beta, Nr, Nc);

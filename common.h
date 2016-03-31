@@ -23,9 +23,9 @@ __global__ void w_kern_hard_thresh_appcoeffs(float* c_a, float beta, int Nr, int
 __global__ void w_kern_circshift(float* d_image, float* d_out, int Nr, int Nc, int sr, int sc);
 
 
-void w_call_soft_thresh(float** d_coeffs, float beta, int Nr, int Nc, int nlevels, int do_swt, int do_thresh_appcoeffs, int ndim);
+void w_call_soft_thresh(float** d_coeffs, float beta, int Nr, int Nc, int nlevels, int do_swt, int do_thresh_appcoeffs, int normalize, int ndim);
 
-void w_call_hard_thresh(float** d_coeffs, float beta, int Nr, int Nc, int nlevels, int do_swt, int do_thresh_appcoeffs, int ndim);
+void w_call_hard_thresh(float** d_coeffs, float beta, int Nr, int Nc, int nlevels, int do_swt, int do_thresh_appcoeffs, int normalize, int ndim);
 
 void w_shrink(float** d_coeffs, float beta, int Nr, int Nc, int nlevels, int do_swt, int do_thresh_appcoeffs, int ndim);
 

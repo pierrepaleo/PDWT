@@ -302,21 +302,21 @@ void Wavelets::inverse(void) {
 }
 
 /// Method : soft thresholding (L1 proximal)
-void Wavelets::soft_threshold(float beta, int do_thresh_appcoeffs) {
+void Wavelets::soft_threshold(float beta, int do_thresh_appcoeffs, int normalize) {
     if (state == W_INVERSE) {
         puts("Warning: Wavelets(): cannot threshold coefficients, as they were modified by W.inverse()");
         return;
     }
-    w_call_soft_thresh(d_coeffs, beta, Nr, Nc, nlevels, do_swt, do_thresh_appcoeffs, ndim);
+    w_call_soft_thresh(d_coeffs, beta, Nr, Nc, nlevels, do_swt, do_thresh_appcoeffs, normalize, ndim);
 }
 
 /// Method : hard thresholding
-void Wavelets::hard_threshold(float beta, int do_thresh_appcoeffs) {
+void Wavelets::hard_threshold(float beta, int do_thresh_appcoeffs, int normalize) {
     if (state == W_INVERSE) {
         puts("Warning: Wavelets(): cannot threshold coefficients, as they were modified by W.inverse()");
         return;
     }
-    w_call_hard_thresh(d_coeffs, beta, Nr, Nc, nlevels, do_swt, do_thresh_appcoeffs, ndim);
+    w_call_hard_thresh(d_coeffs, beta, Nr, Nc, nlevels, do_swt, do_thresh_appcoeffs, normalize, ndim);
 }
 
 /// Method : shrink (L2 proximal)

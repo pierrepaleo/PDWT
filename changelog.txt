@@ -1,0 +1,11 @@
+CHANGELOG
+
+
+Version 0.4 (31/03/2016)
+
+(API BREAK !) The Wavelets approximation coefficients are now NOT thresholded by default for soft and hard thresholding, but are thresholded by default for shrink.
+Added W.set_coeff() setter. This is especially useful when using this library from Python with custom thresholds.
+Added simple adaptive thresholding for hard and soft thresholding.
+    When specifying normalize = 1, the threshold is divided by sqrt(2) at each scale.
+
+
