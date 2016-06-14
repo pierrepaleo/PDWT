@@ -2,12 +2,8 @@
  *
  * TODO :
  *
- *  - W.coeffs[0] is over-written after an inversion.               (FIXME)
- *      so if  W.inverse() is run twice : invalid inverse.
- *      => Implement W.state ?
- *  - Allow both separable and non-separable without re-compiling   (OK)
- *  - User can choose the target device                             (TODO)
- *  - User can provide non-separable filters                        (TODO)
+ *  - ISWT : only appcoeffs at last scale are used (cf Matlab) => Don't store the other appcoeffs ?
+ *  - User can choose the target device
  *  - Doc ! (get_coeffs, ...)
  *
  */
