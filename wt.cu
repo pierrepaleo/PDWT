@@ -151,8 +151,8 @@ Wavelets::Wavelets(
     this->d_coeffs = d_coeffs_new;
 
     if (ndim == 1 && do_separable == 0) {
-        puts("Warning: requestred 1D DWT, which is incompatible with non-separable transform.");
-        puts("Forcing do_separable = 1");
+        puts("Warning: 1D DWT was requestred, which is incompatible with non-separable transform.");
+        puts("Ignoring the do_separable option.");
         do_separable = 1;
     }
     // Filters
@@ -172,7 +172,7 @@ Wavelets::Wavelets(
     else N = Nc;
     int wmaxlev = w_ilog2(N/hlen);
     if (levels > wmaxlev) {
-        printf("Warning: required level (%d) is greater than the maximum possible level for %s (%d).\n", nlevels, wname, wmaxlev);
+        printf("Warning: required level (%d) is greater than the maximum possible level for %s (%d) on a %dx%d image.\n", nlevels, wname, wmaxlev, Nc, Nr);
         printf("Forcing nlevels = %d\n", wmaxlev);
         nlevels = wmaxlev;
     }
