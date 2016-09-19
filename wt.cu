@@ -1,25 +1,13 @@
-/**
- *
- * TODO :
- *
- *  - ISWT : only appcoeffs at last scale are used (cf Matlab) => Don't store the other appcoeffs ?
- *  - User can choose the target device
- *  - Doc ! (get_coeffs, ...)
- *
- */
 #include <stdio.h>
 #include <stdlib.h>
-//~ #include <math.h>
 #include <cuda.h>
 #include <cublas.h>
 #include <cuComplex.h>
-//~ #include <time.h>
 
 #include "wt.h"
 #include "separable.cu"
 #include "nonseparable.cu"
 #include "haar.cu"
-//~ #include "io.h"
 
 #  define CUDACHECK \
   { cudaThreadSynchronize(); \

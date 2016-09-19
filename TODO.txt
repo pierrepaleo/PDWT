@@ -1,0 +1,16 @@
+TODO LIST
+
+- Refactoring :
+    - Create a structure containing informations on WT. Used by Wavelets() class, but also by common functions (to avoid kilometers-long functions signature)
+    - Not all files in same folder (test, src, doc, build)
+    - Remove useless files (profiling) and put i/o in "test"
+    - No more #include "*.cu" !
+- TYPE template to support both double and simple precision
+- Modify inverse haar (and related) to avoid extra memcpy
+- ISWT : only appcoeffs at last scale are used (cf Matlab) : Don't store the other appcoeffs
+- More threshold types
+- Compute norm related to threshold (eg. soft/L1, group-lasso, etc)
+- User-defined target CUDA device
+- Documentation/Howtos
+
+
