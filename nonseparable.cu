@@ -1,33 +1,5 @@
-// For all architectures, constant mem is limited to 64 KB.
-// Here we limit the filter size to 40x40 coefficients => 25.6KB
-// If you know the max width of filters used in practice, it might be interesting to define it here
-// since MAX_FILTER_WIDTH * MAX_FILTER_WIDTH * 4   elements are transfered at each transform scale
-//
-// There are two approaches for inversion :
-//  - compute the inverse filters into the previous constant arrays, before W.inverse(). It is a little slower.
-//  - pre-compute c_kern_inv_XX once for all... faster, but twice more memory is used
-
-#include "filters.h"
+#include "nonseparable.h"
 #include "common.h"
-
-#define MAX_FILTER_WIDTH 40
-
-__constant__ float c_kern_LL[MAX_FILTER_WIDTH * MAX_FILTER_WIDTH];
-__constant__ float c_kern_LH[MAX_FILTER_WIDTH * MAX_FILTER_WIDTH];
-__constant__ float c_kern_HL[MAX_FILTER_WIDTH * MAX_FILTER_WIDTH];
-__constant__ float c_kern_HH[MAX_FILTER_WIDTH * MAX_FILTER_WIDTH];
-
-
-#  define CUDACHECK \
-  { cudaThreadSynchronize(); \
-    cudaError_t last = cudaGetLastError();\
-    if(last!=cudaSuccess) {\
-      printf("ERRORX: %s  %s  %i \n", cudaGetErrorString( last),    __FILE__, __LINE__    );    \
-      exit(1);\
-    }\
-  }
-
-
 
 // outer product of arrays "a", "b" of length "len"
 float* w_outer(float* a, float* b, int len) {
@@ -216,8 +188,9 @@ __global__ void w_kern_inverse(float* img, float* c_a, float* c_h, float* c_v, f
 
 
 
-int w_forward(float* d_image, float** d_coeffs, float* d_tmp, int Nr, int Nc, int levels, int hlen) {
+int w_forward(float* d_image, float** d_coeffs, float* d_tmp, w_info winfos) {
 
+    int Nr = winfos.Nr, Nc = winfos.Nc, levels = winfos.nlevels, hlen = winfos.hlen;
     int tpb = 16; // TODO : tune for max perfs.
     int Nc2 = Nc/2, Nr2 = Nr/2;
     float* d_tmp1, *d_tmp2;
@@ -241,7 +214,8 @@ int w_forward(float* d_image, float** d_coeffs, float* d_tmp, int Nr, int Nc, in
 }
 
 
-int w_inverse(float* d_image, float** d_coeffs, float* d_tmp, int Nr, int Nc, int levels, int hlen) {
+int w_inverse(float* d_image, float** d_coeffs, float* d_tmp, w_info winfos) {
+    int Nr = winfos.Nr, Nc = winfos.Nc, levels = winfos.nlevels, hlen = winfos.hlen;
     int Nr0 = Nr, Nc0 = Nc;
     Nr /= w_ipow2(levels);
     Nc /= w_ipow2(levels);
@@ -261,7 +235,7 @@ int w_inverse(float* d_image, float** d_coeffs, float* d_tmp, int Nr, int Nc, in
         w_swap_ptr(&d_tmp1, &d_tmp2);
     }
     if ((levels & 1) == 0) cudaMemcpy(d_coeffs[0], d_tmp, (Nr0/2)*(Nc0/2)*sizeof(float), cudaMemcpyDeviceToDevice);
-    CUDACHECK;
+    //~ CUDACHECK;
     // First level
     n_blocks = dim3(w_iDivUp(Nc*2, tpb), w_iDivUp(Nr*2, tpb), 1);
     w_kern_inverse<<<n_blocks, n_threads_per_block>>>(d_image, d_coeffs[0], d_coeffs[1], d_coeffs[2], d_coeffs[3], Nr, Nc, hlen);
@@ -384,7 +358,8 @@ __global__ void w_kern_inverse_swt(float* img, float* c_a, float* c_h, float* c_
 
 
 
-int w_forward_swt(float* d_image, float** d_coeffs, float* d_tmp, int Nr, int Nc, int levels, int hlen) {
+int w_forward_swt(float* d_image, float** d_coeffs, float* d_tmp, w_info winfos) {
+    int Nr = winfos.Nr, Nc = winfos.Nc, levels = winfos.nlevels, hlen = winfos.hlen;
 
     float* d_tmp1, *d_tmp2;
     d_tmp1 = d_coeffs[0];
@@ -405,8 +380,8 @@ int w_forward_swt(float* d_image, float** d_coeffs, float* d_tmp, int Nr, int Nc
 
 
 
-int w_inverse_swt(float* d_image, float** d_coeffs, float* d_tmp, int Nr, int Nc, int levels, int hlen) {
-
+int w_inverse_swt(float* d_image, float** d_coeffs, float* d_tmp, w_info winfos) {
+    int Nr = winfos.Nr, Nc = winfos.Nc, levels = winfos.nlevels, hlen = winfos.hlen;
     float* d_tmp1, *d_tmp2;
     d_tmp1 = d_coeffs[0];
     d_tmp2 = d_tmp;

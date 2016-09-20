@@ -2,39 +2,11 @@
 /// ***************** Common utilities and  CUDA Kernels  **********************
 /// ****************************************************************************
 
+//~ #include "utils.h"
 #include "common.h"
 #define W_SIGN(a) ((a > 0) ? (1.0f) : (-1.0f))
 #define SQRT_2 1.4142135623730951
 #include <cublas.h>
-
-
-
-int w_iDivUp(int a, int b) {
-    return (a % b != 0) ? (a / b + 1) : (a / b);
-}
-
-
-int w_ipow2(int a) {
-    return 1 << a;
-}
-
-
-int w_ilog2(int i) {
-    int l = 0;
-    while (i >>= 1) {
-        ++l;
-    }
-    return l;
-}
-
-
-void w_swap_ptr(float** a, float** b) {
-    float* tmp = *a;
-    *a = *b;
-    *b = tmp;
-}
-
-
 
 
 /// soft thresholding of the detail coefficients (2D)
@@ -144,13 +116,14 @@ __global__ void w_kern_circshift(float* d_image, float* d_out, int Nr, int Nc, i
 /// ******************** Common CUDA Kernels calls *****************************
 /// ****************************************************************************
 
-void w_call_soft_thresh(float** d_coeffs, float beta, int Nr, int Nc, int nlevels, int do_swt, int do_thresh_appcoeffs, int normalize, int ndim) {
+void w_call_soft_thresh(float** d_coeffs, float beta, w_info winfos, int do_thresh_appcoeffs, int normalize, int threshold_cousins) {
     int tpb = 16; // Threads per block
     dim3 n_threads_per_block = dim3(tpb, tpb, 1);
     dim3 n_blocks;
+    int Nr = winfos.Nr, Nc = winfos.Nc, do_swt = winfos.do_swt, nlevels = winfos.nlevels, ndims = winfos.ndims;
     int Nr2 = Nr, Nc2 = Nc;
     if (!do_swt) {
-        if (ndim > 1) Nr2 /= 2;
+        if (ndims > 1) Nr2 /= 2;
         Nc2 /= 2;
     }
     if (do_thresh_appcoeffs) {
@@ -165,24 +138,25 @@ void w_call_soft_thresh(float** d_coeffs, float beta, int Nr, int Nc, int nlevel
     }
     for (int i = 0; i < nlevels; i++) {
         if (!do_swt) {
-            if (ndim > 1) Nr /= 2;
+            if (ndims > 1) Nr /= 2;
             Nc /= 2;
         }
         if (normalize > 0) beta /= SQRT_2;
         n_blocks = dim3(w_iDivUp(Nc, tpb), w_iDivUp(Nr, tpb), 1);
-        if (ndim > 1) w_kern_soft_thresh<<<n_blocks, n_threads_per_block>>>(d_coeffs[3*i+1], d_coeffs[3*i+2], d_coeffs[3*i+3], beta, Nr, Nc);
+        if (ndims > 1) w_kern_soft_thresh<<<n_blocks, n_threads_per_block>>>(d_coeffs[3*i+1], d_coeffs[3*i+2], d_coeffs[3*i+3], beta, Nr, Nc);
         else w_kern_soft_thresh_1d<<<n_blocks, n_threads_per_block>>>(d_coeffs[i+1], beta, Nr, Nc);
     }
 }
 
 
-void w_call_hard_thresh(float** d_coeffs, float beta, int Nr, int Nc, int nlevels, int do_swt, int do_thresh_appcoeffs, int normalize, int ndim) {
+void w_call_hard_thresh(float** d_coeffs, float beta, w_info winfos, int do_thresh_appcoeffs, int normalize) {
     int tpb = 16; // Threads per block
     dim3 n_threads_per_block = dim3(tpb, tpb, 1);
     dim3 n_blocks;
+    int Nr = winfos.Nr, Nc = winfos.Nc, do_swt = winfos.do_swt, nlevels = winfos.nlevels, ndims = winfos.ndims;
     int Nr2 = Nr, Nc2 = Nc;
     if (!do_swt) {
-        if (ndim > 1) Nr2 /= 2;
+        if (ndims > 1) Nr2 /= 2;
         Nc2 /= 2;
     }
     float beta2 = beta;
@@ -197,21 +171,22 @@ void w_call_hard_thresh(float** d_coeffs, float beta, int Nr, int Nc, int nlevel
     }
     for (int i = 0; i < nlevels; i++) {
         if (!do_swt) {
-            if (ndim > 1) Nr /= 2;
+            if (ndims > 1) Nr /= 2;
             Nc /= 2;
         }
         if (normalize > 0) beta /= SQRT_2;
         n_blocks = dim3(w_iDivUp(Nc, tpb), w_iDivUp(Nr, tpb), 1);
-        if (ndim > 1) w_kern_hard_thresh<<<n_blocks, n_threads_per_block>>>(d_coeffs[3*i+1], d_coeffs[3*i+2], d_coeffs[3*i+3], beta, Nr, Nc);
+        if (ndims > 1) w_kern_hard_thresh<<<n_blocks, n_threads_per_block>>>(d_coeffs[3*i+1], d_coeffs[3*i+2], d_coeffs[3*i+3], beta, Nr, Nc);
         else w_kern_hard_thresh_1d<<<n_blocks, n_threads_per_block>>>(d_coeffs[i+1], beta, Nr, Nc);
     }
 }
 
 
-void w_shrink(float** d_coeffs, float beta, int Nr, int Nc, int nlevels, int do_swt, int do_thresh_appcoeffs, int ndim) {
+void w_shrink(float** d_coeffs, float beta, w_info winfos, int do_thresh_appcoeffs) {
+    int Nr = winfos.Nr, Nc = winfos.Nc, do_swt = winfos.do_swt, nlevels = winfos.nlevels, ndims = winfos.ndims;
     int Nr2 = Nr, Nc2 = Nc;
     if (!do_swt) {
-        if (ndim > 1) Nr2 /= 2;
+        if (ndims > 1) Nr2 /= 2;
         Nc2 /= 2;
     }
     if (do_thresh_appcoeffs) {
@@ -219,10 +194,10 @@ void w_shrink(float** d_coeffs, float beta, int Nr, int Nc, int nlevels, int do_
     }
     for (int i = 0; i < nlevels; i++) {
         if (!do_swt) {
-            if (ndim > 1) Nr /= 2;
+            if (ndims > 1) Nr /= 2;
             Nc /= 2;
         }
-        if (ndim == 2) {
+        if (ndims == 2) {
             cublasSscal(Nr*Nc, 1.0f/(1.0f + beta), d_coeffs[3*i+1], 1);
             cublasSscal(Nr*Nc, 1.0f/(1.0f + beta), d_coeffs[3*i+2], 1);
             cublasSscal(Nr*Nc, 1.0f/(1.0f + beta), d_coeffs[3*i+3], 1);
@@ -238,14 +213,15 @@ void w_shrink(float** d_coeffs, float beta, int Nr, int Nc, int nlevels, int do_
 
 
 // if inplace = 1, the result is in "d_image" ; otherwise result is in "d_image2".
-void w_call_circshift(float* d_image, float* d_image2, int Nr, int Nc, int sr, int sc, int inplace, int ndim) {
+void w_call_circshift(float* d_image, float* d_image2, w_info winfos, int sr, int sc, int inplace) {
+    int Nr = winfos.Nr, Nc = winfos.Nc, ndims = winfos.ndims;
     // Modulus in C can be negative
     if (sr < 0) sr += Nr; // or do while loops to ensure positive numbers
     if (sc < 0) sc += Nc;
     int tpb = 16; // Threads per block
     sr = sr % Nr;
     sc = sc % Nc;
-    if (ndim == 1) sr = 0;
+    if (ndims == 1) sr = 0;
     dim3 n_blocks = dim3(w_iDivUp(Nc, tpb), w_iDivUp(Nr, tpb), 1);
     dim3 n_threads_per_block = dim3(tpb, tpb, 1);
     if (inplace) {
@@ -258,10 +234,9 @@ void w_call_circshift(float* d_image, float* d_image2, int Nr, int Nc, int sr, i
 }
 
 
-
-
 /// Creates an allocated/padded device array : [ An, H1, V1, D1, ..., Hn, Vn, Dn]
-float** w_create_coeffs_buffer(int Nr, int Nc, int nlevels, int do_swt) {
+float** w_create_coeffs_buffer(w_info winfos) {
+    int Nr = winfos.Nr, Nc = winfos.Nc, do_swt = winfos.do_swt, nlevels = winfos.nlevels;
     int Nr0 = Nr, Nc0 = Nc;
     if (!do_swt) { Nr0 /= 2; Nc0 /= 2; }
     float** res = (float**) calloc(3*nlevels+1, sizeof(float*));
@@ -286,9 +261,9 @@ float** w_create_coeffs_buffer(int Nr, int Nc, int nlevels, int do_swt) {
 }
 
 
-
 /// Creates an allocated/padded device array : [ An, D1, ..., Dn]
-float** w_create_coeffs_buffer_1d(int Nr, int Nc, int nlevels, int do_swt) {
+float** w_create_coeffs_buffer_1d(w_info winfos) {
+    int Nr = winfos.Nr, Nc = winfos.Nc, do_swt = winfos.do_swt, nlevels = winfos.nlevels;
     int Nc0 = Nc;
     if (!do_swt) Nc0 /= 2;
     float** res = (float**) calloc(nlevels+1, sizeof(float*));
@@ -319,7 +294,8 @@ void w_free_coeffs_buffer_1d(float** coeffs, int nlevels) {
 
 
 /// Deep copy of wavelet coefficients. All structures must be allocated.
-void w_copy_coeffs_buffer(float** dst, float** src, int Nr, int Nc, int nlevels, int do_swt) {
+void w_copy_coeffs_buffer(float** dst, float** src, w_info winfos) {
+    int Nr = winfos.Nr, Nc = winfos.Nc, nlevels = winfos.nlevels, do_swt = winfos.do_swt;
     // Coeffs (H, V, D)
     for (int i = 1; i < 3*nlevels+1; i += 3) {
         if (!do_swt) {
@@ -335,7 +311,8 @@ void w_copy_coeffs_buffer(float** dst, float** src, int Nr, int Nc, int nlevels,
 }
 
 
-void w_copy_coeffs_buffer_1d(float** dst, float** src, int Nr, int Nc, int nlevels, int do_swt) {
+void w_copy_coeffs_buffer_1d(float** dst, float** src, w_info winfos) {
+    int Nr = winfos.Nr, Nc = winfos.Nc, nlevels = winfos.nlevels, do_swt = winfos.do_swt;
     // Det Coeffs
     for (int i = 1; i < nlevels+1; i++) {
         if (!do_swt) Nc /= 2;
@@ -354,7 +331,8 @@ void w_copy_coeffs_buffer_1d(float** dst, float** src, int Nr, int Nc, int nleve
 
 
 
-void w_add_coeffs(float** dst, float** src, int Nr, int Nc, int nlevels, int do_swt, float alpha) {
+void w_add_coeffs(float** dst, float** src, w_info winfos, float alpha) {
+    int Nr = winfos.Nr, Nc = winfos.Nc, do_swt = winfos.do_swt, nlevels = winfos.nlevels;
     // Coeffs (H, V, D)
     for (int i = 1; i < 3*nlevels+1; i += 3) {
         if (!do_swt) {
@@ -370,7 +348,8 @@ void w_add_coeffs(float** dst, float** src, int Nr, int Nc, int nlevels, int do_
 }
 
 
-void w_add_coeffs_1d(float** dst, float** src, int Nr, int Nc, int nlevels, int do_swt, float alpha) {
+void w_add_coeffs_1d(float** dst, float** src, w_info winfos, float alpha) {
+    int Nr = winfos.Nr, Nc = winfos.Nc, do_swt = winfos.do_swt, nlevels = winfos.nlevels;
     // Det Coeffs
     for (int i = 1; i < nlevels+1; i++) {
         if (!do_swt) Nc /= 2;
@@ -379,20 +358,6 @@ void w_add_coeffs_1d(float** dst, float** src, int Nr, int Nc, int nlevels, int 
     // App coeff (last scale)
     cublasSaxpy(Nr*Nc, alpha, src[0], 1, dst[0], 1);
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

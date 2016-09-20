@@ -1,3 +1,6 @@
+#include "haar.h"
+//~ #include "utils.h"
+
 // The sqrt(2) factor is applied after two HAAR_*, so it becomes a 0.5 factor
 #define HAAR_AVG(a, b) ((a+b))
 #define HAAR_DIF(a, b) ((a-b))
@@ -44,7 +47,8 @@ __global__ void kern_haar2d_inv(float* img, float* c_a, float* c_h, float* c_v, 
 }
 
 
-int haar_forward2d(float* d_image, float** d_coeffs, float* d_tmp, int Nr, int Nc, int levels) {
+int haar_forward2d(float* d_image, float** d_coeffs, float* d_tmp, w_info winfos) {
+    int Nr = winfos.Nr, Nc = winfos.Nc, levels = winfos.nlevels;
     int Nc2 = Nc/2, Nr2 = Nr/2;
     int tpb = 16; // TODO : tune for max perfs.
     float* d_tmp1, *d_tmp2;
@@ -67,7 +71,8 @@ int haar_forward2d(float* d_image, float** d_coeffs, float* d_tmp, int Nr, int N
     return 0;
 }
 
-int haar_inverse2d(float* d_image, float** d_coeffs, float* d_tmp, int Nr, int Nc, int levels) {
+int haar_inverse2d(float* d_image, float** d_coeffs, float* d_tmp, w_info winfos) {
+    int Nr = winfos.Nr, Nc = winfos.Nc, levels = winfos.nlevels;
     Nr /= w_ipow2(levels);
     Nc /= w_ipow2(levels);
     int tpb = 16; // TODO : tune for max perfs.
@@ -134,7 +139,8 @@ __global__ void kern_haar1d_inv(float* img, float* c_a, float* c_d, int Nr, int 
 
 
 
-int haar_forward1d(float* d_image, float** d_coeffs, float* d_tmp, int Nr, int Nc, int levels) {
+int haar_forward1d(float* d_image, float** d_coeffs, float* d_tmp, w_info winfos) {
+    int Nr = winfos.Nr, Nc = winfos.Nc, levels = winfos.nlevels;
     int Nc2 = Nc/2;
     int tpb = 16; // TODO : tune for max perfs.
     float* d_tmp1, *d_tmp2;
@@ -157,7 +163,8 @@ int haar_forward1d(float* d_image, float** d_coeffs, float* d_tmp, int Nr, int N
 }
 
 
-int haar_inverse1d(float* d_image, float** d_coeffs, float* d_tmp, int Nr, int Nc, int levels) {
+int haar_inverse1d(float* d_image, float** d_coeffs, float* d_tmp, w_info winfos) {
+    int Nr = winfos.Nr, Nc = winfos.Nc, levels = winfos.nlevels;
     Nc /= w_ipow2(levels);
     int tpb = 16; // TODO : tune for max perfs.
     float* d_tmp1, *d_tmp2;

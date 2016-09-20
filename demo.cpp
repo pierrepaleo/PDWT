@@ -77,7 +77,7 @@ int main(int argc, char **argv) {
     // Create the wavelet
     Wavelets W(img, Nr, Nc, wname, nlevels, 1, do_separable, do_cycle_spinning, do_swt);
     W.print_informations();
-    nlevels = W.nlevels;
+    nlevels = W.winfos.nlevels;
 
     // Example of custom filter (here: LeGall 9/7 lossy wavelet)
     /*

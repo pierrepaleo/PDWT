@@ -7,6 +7,8 @@ TODO LIST
     - No more #include "*.cu" !
 - TYPE template to support both double and simple precision
 - Modify inverse haar (and related) to avoid extra memcpy
+- DWT: Image padding for non-friendly sizes (with warning)
+- Nonseparable SWT re-computes the inverse filters at each inversion (for memory requirements). See if there is a workaround.
 - ISWT : only appcoeffs at last scale are used (cf Matlab) : Don't store the other appcoeffs
 - More threshold types
 - Compute norm related to threshold (eg. soft/L1, group-lasso, etc)

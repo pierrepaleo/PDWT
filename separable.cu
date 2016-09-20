@@ -1,27 +1,5 @@
-#include "filters.h"
+#include "separable.h"
 #include "common.h"
-
-#define MAX_FILTER_WIDTH 40
-
-#  define CUDACHECK \
-  { cudaThreadSynchronize(); \
-    cudaError_t last = cudaGetLastError();\
-    if(last!=cudaSuccess) {\
-      printf("ERRORX: %s  %s  %i \n", cudaGetErrorString( last),    __FILE__, __LINE__    );    \
-      exit(1);\
-    }\
-  }
-
-
-
-
-__constant__ float c_kern_L[MAX_FILTER_WIDTH];
-__constant__ float c_kern_H[MAX_FILTER_WIDTH];
-__constant__ float c_kern_IL[MAX_FILTER_WIDTH];
-__constant__ float c_kern_IH[MAX_FILTER_WIDTH];
-
-
-
 
 /// Compute the low-pass and high-pass filters for separable convolutions.
 /// wname: name of the filter ("haar", "db3", "sym4", ...)
@@ -59,6 +37,14 @@ int w_compute_filters_separable(const char* wname, int do_swt) {
     cudaMemcpyToSymbol(c_kern_H, f1_h, hlen*sizeof(float), 0, cudaMemcpyHostToDevice);
     cudaMemcpyToSymbol(c_kern_IL, f1_il, hlen*sizeof(float), 0, cudaMemcpyHostToDevice);
     cudaMemcpyToSymbol(c_kern_IH, f1_ih, hlen*sizeof(float), 0, cudaMemcpyHostToDevice);
+
+    //DEBUG
+    printf("hlen = %d\n", hlen);
+    for (int i = 0; i < hlen; i++) {
+        printf("%f\n", f1_l[i]);
+    }
+
+
 
     return hlen;
 }
@@ -154,7 +140,8 @@ __global__ void w_kern_forward_pass2(float* tmp_a1, float* tmp_a2, float* c_a, f
 }
 
 
-int w_forward_separable(float* d_image, float** d_coeffs, float* d_tmp, int Nr, int Nc, int levels, int hlen) {
+int w_forward_separable(float* d_image, float** d_coeffs, float* d_tmp, w_info winfos) {
+    int Nr = winfos.Nr, Nc = winfos.Nc, levels = winfos.nlevels, hlen = winfos.hlen;
     float* d_tmp1 = d_tmp;
     float* d_tmp2 = d_tmp + Nr*Nc/2;
 
@@ -183,7 +170,8 @@ int w_forward_separable(float* d_image, float** d_coeffs, float* d_tmp, int Nr, 
 
 
 // (batched) 1D transform. It boils down to the 2D separable transform without the second pass.
-int w_forward_separable_1d(float* d_image, float** d_coeffs, float* d_tmp, int Nr, int Nc, int levels, int hlen) {
+int w_forward_separable_1d(float* d_image, float** d_coeffs, float* d_tmp, w_info winfos) {
+    int Nr = winfos.Nr, Nc = winfos.Nc, levels = winfos.nlevels, hlen = winfos.hlen;
     float* d_tmp1 = d_coeffs[0];
     float* d_tmp2 = d_tmp;
     // First level
@@ -298,7 +286,8 @@ __global__ void w_kern_inverse_pass2(float* tmp1, float* tmp2, float* img, int N
 }
 
 
-int w_inverse_separable(float* d_image, float** d_coeffs, float* d_tmp, int Nr, int Nc, int levels, int hlen) {
+int w_inverse_separable(float* d_image, float** d_coeffs, float* d_tmp, w_info winfos) {
+    int Nr = winfos.Nr, Nc = winfos.Nc, levels = winfos.nlevels, hlen = winfos.hlen;
     float* d_tmp1 = d_tmp;
     float* d_tmp2 = d_tmp + Nr*Nc/2;
 
@@ -329,7 +318,8 @@ int w_inverse_separable(float* d_image, float** d_coeffs, float* d_tmp, int Nr, 
 
 
 // (batched) 1D inverse transform. Boils down to 2D separable transform without the first pass.
-int w_inverse_separable_1d(float* d_image, float** d_coeffs, float* d_tmp, int Nr, int Nc, int levels, int hlen) {
+int w_inverse_separable_1d(float* d_image, float** d_coeffs, float* d_tmp, w_info winfos) {
+    int Nr = winfos.Nr, Nc = winfos.Nc, levels = winfos.nlevels, hlen = winfos.hlen;
     float* d_tmp1 = d_coeffs[0];
     float* d_tmp2 = d_tmp;
     Nc /= w_ipow2(levels);
@@ -452,7 +442,8 @@ __global__ void w_kern_forward_swt_pass2(float* tmp_a1, float* tmp_a2, float* c_
 }
 
 
-int w_forward_swt_separable(float* d_image, float** d_coeffs, float* d_tmp, int Nr, int Nc, int levels, int hlen) {
+int w_forward_swt_separable(float* d_image, float** d_coeffs, float* d_tmp, w_info winfos) {
+    int Nr = winfos.Nr, Nc = winfos.Nc, levels = winfos.nlevels, hlen = winfos.hlen;
 
     float* d_tmp1 = d_tmp;
     float* d_tmp2 = d_tmp + Nr*Nc;
@@ -474,7 +465,8 @@ int w_forward_swt_separable(float* d_image, float** d_coeffs, float* d_tmp, int 
 
 
 // (batched) 1D forward SWT. Boils down to 2D non-separable transform without the second pass.
-int w_forward_swt_separable_1d(float* d_image, float** d_coeffs, float* d_tmp, int Nr, int Nc, int levels, int hlen) {
+int w_forward_swt_separable_1d(float* d_image, float** d_coeffs, float* d_tmp, w_info winfos) {
+    int Nr = winfos.Nr, Nc = winfos.Nc, levels = winfos.nlevels, hlen = winfos.hlen;
 
     float* d_tmp1 = d_coeffs[0];
     float* d_tmp2 = d_tmp;
@@ -583,8 +575,9 @@ __global__ void w_kern_inverse_swt_pass2(float* tmp1, float* tmp2, float* img, i
 }
 
 
-int w_inverse_swt_separable(float* d_image, float** d_coeffs, float* d_tmp, int Nr, int Nc, int levels, int hlen) {
+int w_inverse_swt_separable(float* d_image, float** d_coeffs, float* d_tmp, w_info winfos) {
 
+    int Nr = winfos.Nr, Nc = winfos.Nc, levels = winfos.nlevels, hlen = winfos.hlen;
     float* d_tmp1 = d_tmp;
     float* d_tmp2 = d_tmp + Nr*Nc;
 
@@ -606,8 +599,9 @@ int w_inverse_swt_separable(float* d_image, float** d_coeffs, float* d_tmp, int 
 
 
 // (batched) 1D inverse SWT. Boils down to 2D non-separable transform without the first pass.
-int w_inverse_swt_separable_1d(float* d_image, float** d_coeffs, float* d_tmp, int Nr, int Nc, int levels, int hlen) {
+int w_inverse_swt_separable_1d(float* d_image, float** d_coeffs, float* d_tmp, w_info winfos) {
 
+    int Nr = winfos.Nr, Nc = winfos.Nc, levels = winfos.nlevels, hlen = winfos.hlen;
     float* d_tmp1 = d_coeffs[0];
     float* d_tmp2 = d_tmp;
 

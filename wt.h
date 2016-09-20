@@ -1,6 +1,7 @@
 #ifndef WT_H
 #define WT_H
 
+#include "utils.h"
 
 // Possible states of the Wavelet class.
 // It prevents, for example, W.inverse() from being run twice (since W.d_coeffs[0] is modified)
@@ -16,21 +17,19 @@ class Wavelets {
   public:
     // Members
     // --------
-    int Nr; // Number of rows of the image
-    int Nc; // Number of columns of the image
-    int nlevels; // Number of levels for the wavelet decomposition
     float* d_image; // Image (input or result of reconstruction), on device
     float** d_coeffs; // Wavelet coefficients, on device
     float* d_tmp; // Temporary device array (to avoid multiple malloc/free)
-    int do_cycle_spinning;
+
     int current_shift_r;
     int current_shift_c;
     int hlen; // Filter length
     char wname[128]; // Wavelet name
-    int do_swt; // 1 if performing undecimated WT
     int do_separable; // 1 if performing separable WT
+    int do_cycle_spinning;  // Do image shifting for approximate TI denoising
+    w_info winfos;
     w_state state;
-    int ndim; // number of dimensions of the transform
+
 
     // Operations
     // -----------
@@ -51,7 +50,7 @@ class Wavelets {
     // Methods
     // -------
     void forward();
-    void soft_threshold(float beta, int do_thresh_appcoeffs = 0, int normalize = 0);
+    void soft_threshold(float beta, int do_thresh_appcoeffs = 0, int normalize = 0, int threshold_cousins = 0);
     void hard_threshold(float beta, int do_thresh_appcoeffs = 0, int normalize = 0);
     void shrink(float beta, int do_thresh_appcoeffs = 1);
     void circshift(int sr, int sc, int inplace = 1);
