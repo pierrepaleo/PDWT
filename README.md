@@ -29,7 +29,6 @@ All the transforms are computed with the **periodic boundary extension** (the di
 * 3D is not handled at the moment. This should come in the future.
 * Only the periodic boundary extension is implemented.
 * The parallel part is implemented in CUDA, so only Nvidia GPUs can be used.
-* The computations are done on floating point 32 bits precision (float32), since most GPUs are not so efficient with double precision.
 
 
 ## Installation
