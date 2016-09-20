@@ -33,9 +33,9 @@
 Wavelets& Wavelets::operator=(const Wavelets &rhs) {
   if (this != &rhs) { // protect against invalid self-assignment
     // allocate new memory and copy the elements
-    size_t sz = rhs.Nr * rhs.Nc * sizeof(float);
-    float* new_image, *new_tmp;
-    float** new_coeffs;
+    size_t sz = rhs.Nr * rhs.Nc * sizeof(DTYPE);
+    DTYPE* new_image, *new_tmp;
+    DTYPE** new_coeffs;
     cudaMalloc(&new_image, sz);
     cudaMemcpy(new_image, rhs.d_image, sz, cudaMemcpyDeviceToDevice);
 
@@ -78,7 +78,7 @@ Wavelets::Wavelets(void) : d_image(NULL), d_coeffs(NULL), do_cycle_spinning(0), 
 
 /// Constructor :  Wavelets from image
 Wavelets::Wavelets(
-    float* img,
+    DTYPE* img,
     int Nr,
     int Nc,
     const char* wname,
@@ -110,19 +110,19 @@ Wavelets::Wavelets(
     }
 
     // Image
-    float* d_arr_in;
-    cudaMalloc(&d_arr_in, Nr*Nc*sizeof(float));
-    if (!img) cudaMemset(d_arr_in, 0, Nr*Nc*sizeof(float));
+    DTYPE* d_arr_in;
+    cudaMalloc(&d_arr_in, Nr*Nc*sizeof(DTYPE));
+    if (!img) cudaMemset(d_arr_in, 0, Nr*Nc*sizeof(DTYPE));
     else {
         cudaMemcpyKind transfer;
         if (memisonhost) transfer = cudaMemcpyHostToDevice;
         else transfer = cudaMemcpyDeviceToDevice;
-        cudaMemcpy(d_arr_in, img, Nr*Nc*sizeof(float), transfer);
+        cudaMemcpy(d_arr_in, img, Nr*Nc*sizeof(DTYPE), transfer);
     }
     d_image = d_arr_in;
 
-    float* d_tmp_new;
-    cudaMalloc(&d_tmp_new, 2*Nr*Nc*sizeof(float)); // Two temp. images
+    DTYPE* d_tmp_new;
+    cudaMalloc(&d_tmp_new, 2*Nr*Nc*sizeof(DTYPE)); // Two temp. images
     d_tmp = d_tmp_new;
 
     // Dimensions
@@ -132,7 +132,7 @@ Wavelets::Wavelets(
     }
 
     // Coeffs
-    float** d_coeffs_new;
+    DTYPE** d_coeffs_new;
     if (ndim == 1) d_coeffs_new = w_create_coeffs_buffer_1d(winfos);
     else if (ndim == 2) d_coeffs_new = w_create_coeffs_buffer(winfos);
     else {
@@ -195,9 +195,9 @@ Wavelets::Wavelets(const Wavelets &W) :
     winfos.do_swt = W.winfos.do_swt;
 
     strncpy(wname, W.wname, 128);
-    cudaMalloc(&d_image, winfos.Nr*winfos.Nc*sizeof(float));
-    cudaMemcpy(d_image, W.d_image, winfos.Nr*winfos.Nc*sizeof(float), cudaMemcpyDeviceToDevice);
-    cudaMalloc(&d_tmp, 2*winfos.Nr*winfos.Nc*sizeof(float));
+    cudaMalloc(&d_image, winfos.Nr*winfos.Nc*sizeof(DTYPE));
+    cudaMemcpy(d_image, W.d_image, winfos.Nr*winfos.Nc*sizeof(DTYPE), cudaMemcpyDeviceToDevice);
+    cudaMalloc(&d_tmp, 2*winfos.Nr*winfos.Nc*sizeof(DTYPE));
 
     if (winfos.ndims == 1) {
         d_coeffs = w_create_coeffs_buffer_1d(winfos);
@@ -288,7 +288,7 @@ void Wavelets::inverse(void) {
 }
 
 /// Method : soft thresholding (L1 proximal)
-void Wavelets::soft_threshold(float beta, int do_thresh_appcoeffs, int normalize, int threshold_cousins) {
+void Wavelets::soft_threshold(DTYPE beta, int do_thresh_appcoeffs, int normalize, int threshold_cousins) {
     if (state == W_INVERSE) {
         puts("Warning: Wavelets(): cannot threshold coefficients, as they were modified by W.inverse()");
         return;
@@ -297,7 +297,7 @@ void Wavelets::soft_threshold(float beta, int do_thresh_appcoeffs, int normalize
 }
 
 /// Method : hard thresholding
-void Wavelets::hard_threshold(float beta, int do_thresh_appcoeffs, int normalize) {
+void Wavelets::hard_threshold(DTYPE beta, int do_thresh_appcoeffs, int normalize) {
     if (state == W_INVERSE) {
         puts("Warning: Wavelets(): cannot threshold coefficients, as they were modified by W.inverse()");
         return;
@@ -306,7 +306,7 @@ void Wavelets::hard_threshold(float beta, int do_thresh_appcoeffs, int normalize
 }
 
 /// Method : shrink (L2 proximal)
-void Wavelets::shrink(float beta, int do_thresh_appcoeffs) {
+void Wavelets::shrink(DTYPE beta, int do_thresh_appcoeffs) {
     if (state == W_INVERSE) {
         puts("Warning: Wavelets(): cannot threshold coefficients, as they were modified by W.inverse()");
         return;
@@ -322,68 +322,68 @@ void Wavelets::circshift(int sr, int sc, int inplace) {
     w_call_circshift(d_image, d_tmp, winfos, sr, sc, inplace);
 }
 /// Method : squared L2 norm
-float Wavelets::norm2sq(void) {
-    float res = 0.0f;
+DTYPE Wavelets::norm2sq(void) {
+    DTYPE res = 0.0f;
     int Nr2, Nc2;
     if (!winfos.do_swt) { Nr2 = winfos.Nr/2; Nc2 = winfos.Nc/2; }
     else { Nr2 = winfos.Nr; Nc2 = winfos.Nc; }
-    float tmp = 0;
+    DTYPE tmp = 0;
     for (int i = 0; i < winfos.nlevels; i++) {
-        tmp = cublasSnrm2(Nr2*Nc2, d_coeffs[3*i+1], 1);
+        tmp = cublas_nrm2(Nr2*Nc2, d_coeffs[3*i+1], 1);
         res += tmp*tmp;
-        tmp =cublasSnrm2(Nr2*Nc2, d_coeffs[3*i+2], 1);
+        tmp =cublas_nrm2(Nr2*Nc2, d_coeffs[3*i+2], 1);
         res += tmp*tmp;
-        tmp = cublasSnrm2(Nr2*Nc2, d_coeffs[3*i+3], 1);
+        tmp = cublas_nrm2(Nr2*Nc2, d_coeffs[3*i+3], 1);
         res += tmp*tmp;
         if (!winfos.do_swt) { Nr2 /= 2; Nc2 /= 2; }
     }
     int nels = ((winfos.do_swt) ? (Nr2*Nc2) : (Nr2*Nc2*4));
-    tmp = cublasSnrm2(nels, d_coeffs[0], 1);
+    tmp = cublas_nrm2(nels, d_coeffs[0], 1);
     res += tmp*tmp;
     return res;
 }
 
 /// Method : L1 norm
-float Wavelets::norm1(void) {
-    float res = 0.0f;
+DTYPE Wavelets::norm1(void) {
+    DTYPE res = 0.0f;
     int Nr2 = winfos.Nr, Nc2 = winfos.Nc;
     if (!winfos.do_swt) { if (winfos.ndims > 1) Nr2 = winfos.Nr/2; Nc2 = winfos.Nc/2; }
     for (int i = 0; i < winfos.nlevels; i++) {
         if (winfos.ndims == 2) { // 2D
-            res += cublasSasum(Nr2*Nc2, d_coeffs[3*i+1], 1);
-            res += cublasSasum(Nr2*Nc2, d_coeffs[3*i+2], 1);
-            res += cublasSasum(Nr2*Nc2, d_coeffs[3*i+3], 1);
+            res += cublas_asum(Nr2*Nc2, d_coeffs[3*i+1], 1);
+            res += cublas_asum(Nr2*Nc2, d_coeffs[3*i+2], 1);
+            res += cublas_asum(Nr2*Nc2, d_coeffs[3*i+3], 1);
         }
         else { // 1D
-            res += cublasSasum(Nr2*Nc2, d_coeffs[i+1], 1);
+            res += cublas_asum(Nr2*Nc2, d_coeffs[i+1], 1);
         }
         if (!winfos.do_swt) { if (winfos.ndims > 1) Nr2 /= 2; Nc2 /= 2; }
     }
     int nels;
     if (winfos.ndims == 2) nels = ((winfos.do_swt) ? (Nr2*Nc2) : (Nr2*Nc2*4));
     else nels = ((winfos.do_swt) ? (Nr2*Nc2) : (Nr2*Nc2*2));
-    res += cublasSasum(nels, d_coeffs[0], 1);
+    res += cublas_asum(nels, d_coeffs[0], 1);
     return res;
 }
 
 /// Method : get the image from device
-int Wavelets::get_image(float* res) { // TODO: more defensive
-    cudaMemcpy(res, d_image, winfos.Nr*winfos.Nc*sizeof(float), cudaMemcpyDeviceToHost);
+int Wavelets::get_image(DTYPE* res) { // TODO: more defensive
+    cudaMemcpy(res, d_image, winfos.Nr*winfos.Nc*sizeof(DTYPE), cudaMemcpyDeviceToHost);
     return winfos.Nr*winfos.Nc;
 }
 
 /// Method : set the class image
-void Wavelets::set_image(float* img, int mem_is_on_device) { // There are no memory check !
+void Wavelets::set_image(DTYPE* img, int mem_is_on_device) { // There are no memory check !
     cudaMemcpyKind copykind;
     if (mem_is_on_device) copykind = cudaMemcpyDeviceToDevice;
     else copykind = cudaMemcpyHostToDevice;
-    cudaMemcpy(d_image, img, winfos.Nr*winfos.Nc*sizeof(float), copykind);
+    cudaMemcpy(d_image, img, winfos.Nr*winfos.Nc*sizeof(DTYPE), copykind);
     state = W_INIT;
 }
 
 
 /// Method : set a coefficient
-void Wavelets::set_coeff(float* coeff, int num, int mem_is_on_device) { // There are no memory check !
+void Wavelets::set_coeff(DTYPE* coeff, int num, int mem_is_on_device) { // There are no memory check !
     cudaMemcpyKind copykind;
     if (mem_is_on_device) copykind = cudaMemcpyDeviceToDevice;
     else copykind = cudaMemcpyHostToDevice;
@@ -399,7 +399,7 @@ void Wavelets::set_coeff(float* coeff, int num, int mem_is_on_device) { // There
             Nc2 /= factor;
         }
     }
-    cudaMemcpy(d_coeffs[num], coeff, Nr2*Nc2*sizeof(float), copykind);
+    cudaMemcpy(d_coeffs[num], coeff, Nr2*Nc2*sizeof(DTYPE), copykind);
     //~ state = W_FORWARD; // ?
 }
 
@@ -408,7 +408,7 @@ void Wavelets::set_coeff(float* coeff, int num, int mem_is_on_device) { // There
 
 
 /// Method : get a coefficient vector from device
-int Wavelets::get_coeff(float* coeff, int num) {
+int Wavelets::get_coeff(DTYPE* coeff, int num) {
     if (state == W_INVERSE) {
         puts("Warning: get_coeff(): inverse() has been performed, the coefficients has been modified and do not make sense anymore.");
         // TODO : then what ?
@@ -426,7 +426,7 @@ int Wavelets::get_coeff(float* coeff, int num) {
         }
     }
     //~ printf("Retrieving %d (%d x %d)\n", num, Nr2, Nc2);
-    cudaMemcpy(coeff, d_coeffs[num], Nr2*Nc2*sizeof(float), cudaMemcpyDeviceToHost);
+    cudaMemcpy(coeff, d_coeffs[num], Nr2*Nc2*sizeof(DTYPE), cudaMemcpyDeviceToHost);
     return Nr2*Nc2;
 }
 
@@ -453,13 +453,13 @@ void Wavelets::print_informations() {
     if (!winfos.do_swt) {
         // DWT : size(output) = size(input), since sizes are halved at each level.
         // d_image (1), d_coeffs (1), d_tmp (2)
-        mem_used = 5*winfos.Nr*winfos.Nc*sizeof(float);
+        mem_used = 5*winfos.Nr*winfos.Nc*sizeof(DTYPE);
     }
     else {
         // SWT : size(output) = size(input)*4*levels
         // d_image (1), d_coeffs (3*levels+1), d_tmp (2)
-        if (winfos.ndims == 2) mem_used = (3*winfos.nlevels+4)*winfos.Nr*winfos.Nc*sizeof(float);
-        else mem_used = (winfos.nlevels+4)*winfos.Nr*winfos.Nc*sizeof(float);
+        if (winfos.ndims == 2) mem_used = (3*winfos.nlevels+4)*winfos.Nr*winfos.Nc*sizeof(DTYPE);
+        else mem_used = (winfos.nlevels+4)*winfos.Nr*winfos.Nc*sizeof(DTYPE);
     }
     printf("Estimated memory footprint : %.2f MB\n", mem_used/1e6);
 
@@ -478,36 +478,36 @@ void Wavelets::print_informations() {
 /// Provide a custom filter bank to the current Wavelet instance.
 /// If do_separable = 1, the filters are expected to be L, H.
 /// Otherwise, the filters are expected to be A, H, V, D (square size)
-int Wavelets::set_filters_forward(int len, float* filter1, float* filter2, float* filter3, float* filter4) {
+int Wavelets::set_filters_forward(int len, DTYPE* filter1, DTYPE* filter2, DTYPE* filter3, DTYPE* filter4) {
     if (len > MAX_FILTER_WIDTH) {
         printf("ERROR: Wavelets.set_filters_forward(): filter length (%d) exceeds the maximum size (%d)\n", len, MAX_FILTER_WIDTH);
         return -1;
     }
     if (do_separable) {
-        cudaMemcpyToSymbol(c_kern_L, filter1, len*sizeof(float), 0, cudaMemcpyHostToDevice);
-        cudaMemcpyToSymbol(c_kern_H, filter2, len*sizeof(float), 0, cudaMemcpyHostToDevice);
+        cudaMemcpyToSymbol(c_kern_L, filter1, len*sizeof(DTYPE), 0, cudaMemcpyHostToDevice);
+        cudaMemcpyToSymbol(c_kern_H, filter2, len*sizeof(DTYPE), 0, cudaMemcpyHostToDevice);
     }
     else {
         if (filter3 == NULL || filter4 == NULL) {
             puts("ERROR: Wavelets.set_filters_forward(): expected argument 4 and 5 for non-separable filtering");
             return -2;
         }
-        cudaMemcpyToSymbol(c_kern_LL, filter1, len*len*sizeof(float), 0, cudaMemcpyHostToDevice);
-        cudaMemcpyToSymbol(c_kern_LH, filter2, len*len*sizeof(float), 0, cudaMemcpyHostToDevice);
-        cudaMemcpyToSymbol(c_kern_HL, filter3, len*len*sizeof(float), 0, cudaMemcpyHostToDevice);
-        cudaMemcpyToSymbol(c_kern_HH, filter4, len*len*sizeof(float), 0, cudaMemcpyHostToDevice);
+        cudaMemcpyToSymbol(c_kern_LL, filter1, len*len*sizeof(DTYPE), 0, cudaMemcpyHostToDevice);
+        cudaMemcpyToSymbol(c_kern_LH, filter2, len*len*sizeof(DTYPE), 0, cudaMemcpyHostToDevice);
+        cudaMemcpyToSymbol(c_kern_HL, filter3, len*len*sizeof(DTYPE), 0, cudaMemcpyHostToDevice);
+        cudaMemcpyToSymbol(c_kern_HH, filter4, len*len*sizeof(DTYPE), 0, cudaMemcpyHostToDevice);
     }
     winfos.hlen = len;
     return 0;
 }
 
 /// Here the filters are assumed to be of the same size of those provided to set_filters_forward()
-int Wavelets::set_filters_inverse(float* filter1, float* filter2, float* filter3, float* filter4) {
+int Wavelets::set_filters_inverse(DTYPE* filter1, DTYPE* filter2, DTYPE* filter3, DTYPE* filter4) {
     int len = winfos.hlen;
     if (do_separable) {
         // ignoring args 4 and 5
-        cudaMemcpyToSymbol(c_kern_IL, filter1, len*sizeof(float), 0, cudaMemcpyHostToDevice);
-        cudaMemcpyToSymbol(c_kern_IH, filter2, len*sizeof(float), 0, cudaMemcpyHostToDevice);
+        cudaMemcpyToSymbol(c_kern_IL, filter1, len*sizeof(DTYPE), 0, cudaMemcpyHostToDevice);
+        cudaMemcpyToSymbol(c_kern_IH, filter2, len*sizeof(DTYPE), 0, cudaMemcpyHostToDevice);
     }
     else {
         if (filter3 == NULL || filter4 == NULL) {
@@ -515,10 +515,10 @@ int Wavelets::set_filters_inverse(float* filter1, float* filter2, float* filter3
             return -2;
         }
         // The same symbols are used for the inverse filters
-        cudaMemcpyToSymbol(c_kern_LL, filter1, len*len*sizeof(float), 0, cudaMemcpyHostToDevice);
-        cudaMemcpyToSymbol(c_kern_LH, filter2, len*len*sizeof(float), 0, cudaMemcpyHostToDevice);
-        cudaMemcpyToSymbol(c_kern_HL, filter3, len*len*sizeof(float), 0, cudaMemcpyHostToDevice);
-        cudaMemcpyToSymbol(c_kern_HH, filter4, len*len*sizeof(float), 0, cudaMemcpyHostToDevice);
+        cudaMemcpyToSymbol(c_kern_LL, filter1, len*len*sizeof(DTYPE), 0, cudaMemcpyHostToDevice);
+        cudaMemcpyToSymbol(c_kern_LH, filter2, len*len*sizeof(DTYPE), 0, cudaMemcpyHostToDevice);
+        cudaMemcpyToSymbol(c_kern_HL, filter3, len*len*sizeof(DTYPE), 0, cudaMemcpyHostToDevice);
+        cudaMemcpyToSymbol(c_kern_HH, filter4, len*len*sizeof(DTYPE), 0, cudaMemcpyHostToDevice);
     }
     return 0;
 }
@@ -543,7 +543,7 @@ int Wavelets::set_filters_inverse(float* filter1, float* filter2, float* filter3
  * \return 0 if no error
  *
  */
-int Wavelets::add_wavelet(Wavelets W, float alpha) {
+int Wavelets::add_wavelet(Wavelets W, DTYPE alpha) {
 
     // Various checks
     if ((winfos.nlevels != W.winfos.nlevels) || (strcasecmp(wname, W.wname))) {

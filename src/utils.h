@@ -24,7 +24,7 @@ int w_ipow2(int a);
 
 int w_ilog2(int i);
 
-void w_swap_ptr(float** a, float** b);
+void w_swap_ptr(DTYPE** a, DTYPE** b);
 
 
 #endif

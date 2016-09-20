@@ -49,7 +49,7 @@ int main(int argc, char **argv) {
 
     // Read image
     int Nr = 512, Nc = 512;
-    float* img = read_dat_file_float("lena.dat", Nr*Nc);
+    DTYPE* img = read_dat_file_DTYPE("lena.dat", Nr*Nc);
     if (img == NULL) exit(1);
     //~ Nr = 1; // uncomment for 1D transform
     int what = 0;
@@ -82,11 +82,11 @@ int main(int argc, char **argv) {
     // Example of custom filter (here: LeGall 9/7 lossy wavelet)
     /*
     int len = 10;
-    float* filter1, *filter2, *ifilter1, *ifilter2;
-    filter1 = (float*) calloc(len, sizeof(float));
-    filter2 = (float*) calloc(len, sizeof(float));
-    ifilter1 = (float*) calloc(len, sizeof(float));
-    ifilter2 = (float*) calloc(len, sizeof(float));
+    DTYPE* filter1, *filter2, *ifilter1, *ifilter2;
+    filter1 = (DTYPE*) calloc(len, sizeof(DTYPE));
+    filter2 = (DTYPE*) calloc(len, sizeof(DTYPE));
+    ifilter1 = (DTYPE*) calloc(len, sizeof(DTYPE));
+    ifilter2 = (DTYPE*) calloc(len, sizeof(DTYPE));
 
     filter1[0] = 0.026748757411 ;
     filter1[1] = -0.016864118443;
@@ -137,9 +137,9 @@ int main(int argc, char **argv) {
     W.forward();
     puts("Forward OK");
 
-    float* thecoeffs = (float*) calloc(Nr*Nc, sizeof(float)); // larger than needed
+    DTYPE* thecoeffs = (DTYPE*) calloc(Nr*Nc, sizeof(DTYPE)); // larger than needed
     int nels = W.get_coeff(thecoeffs, 0); //3*(nlevels-1)+3);
-    write_dat_file_float("res.dat", thecoeffs, nels);
+    write_dat_file_DTYPE("res.dat", thecoeffs, nels);
     if (what == 1) {
         printf("Approximation coefficients (level %d) are stored in res.dat\n", nlevels);
         return 0;
@@ -154,14 +154,14 @@ int main(int argc, char **argv) {
 
     // Perform inverse WT with current configuration.
     // Ensures that the result is actually the inverse
-    float* dummy = (float*) calloc(Nr*Nc, sizeof(float));
+    DTYPE* dummy = (DTYPE*) calloc(Nr*Nc, sizeof(DTYPE));
     W.set_image(dummy, 0);
 
     W.inverse();
     puts("Inverse OK");
 
     W.get_image(img);
-    write_dat_file_float("res.dat", img, Nr*Nc);
+    write_dat_file_DTYPE("res.dat", img, Nr*Nc);
     puts("Wrote result in res.dat");
 
     return 0;

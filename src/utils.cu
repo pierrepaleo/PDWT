@@ -20,8 +20,8 @@ int w_ilog2(int i) {
 }
 
 
-void w_swap_ptr(float** a, float** b) {
-    float* tmp = *a;
+void w_swap_ptr(DTYPE** a, DTYPE** b) {
+    DTYPE* tmp = *a;
     *a = *b;
     *b = tmp;
 }

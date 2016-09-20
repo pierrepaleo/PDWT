@@ -2,8 +2,8 @@
 #include "common.h"
 
 // outer product of arrays "a", "b" of length "len"
-float* w_outer(float* a, float* b, int len) {
-    float* res = (float*) calloc(len*len, sizeof(float));
+DTYPE* w_outer(DTYPE* a, DTYPE* b, int len) {
+    DTYPE* res = (DTYPE*) calloc(len*len, sizeof(DTYPE));
     for (int i = 0; i < len; i++) {
         for (int j = 0; j < len; j++) {
             res[i*len+j] = a[i]*b[j];
@@ -24,9 +24,9 @@ int w_compute_filters(const char* wname, int direction, int do_swt) {
         return -1;
     }
     int hlen = 0;
-    float* f1_l; // 1D lowpass
-    float* f1_h; // 1D highpass
-    float* f2_a, *f2_h, *f2_v, *f2_d; // 2D filters
+    DTYPE* f1_l; // 1D lowpass
+    DTYPE* f1_h; // 1D highpass
+    DTYPE* f2_a, *f2_h, *f2_v, *f2_d; // 2D filters
 
     // Haar filters has specific kernels
     if (!do_swt) {
@@ -63,10 +63,10 @@ int w_compute_filters(const char* wname, int direction, int do_swt) {
     f2_d = w_outer(f1_h, f1_h, hlen);
 
     // Copy the filters to device constant memory
-    cudaMemcpyToSymbol(c_kern_LL, f2_a, hlen*hlen*sizeof(float), 0, cudaMemcpyHostToDevice);
-    cudaMemcpyToSymbol(c_kern_LH, f2_h, hlen*hlen*sizeof(float), 0, cudaMemcpyHostToDevice); // CHECKME
-    cudaMemcpyToSymbol(c_kern_HL, f2_v, hlen*hlen*sizeof(float), 0, cudaMemcpyHostToDevice);
-    cudaMemcpyToSymbol(c_kern_HH, f2_d, hlen*hlen*sizeof(float), 0, cudaMemcpyHostToDevice);
+    cudaMemcpyToSymbol(c_kern_LL, f2_a, hlen*hlen*sizeof(DTYPE), 0, cudaMemcpyHostToDevice);
+    cudaMemcpyToSymbol(c_kern_LH, f2_h, hlen*hlen*sizeof(DTYPE), 0, cudaMemcpyHostToDevice); // CHECKME
+    cudaMemcpyToSymbol(c_kern_HL, f2_v, hlen*hlen*sizeof(DTYPE), 0, cudaMemcpyHostToDevice);
+    cudaMemcpyToSymbol(c_kern_HH, f2_d, hlen*hlen*sizeof(DTYPE), 0, cudaMemcpyHostToDevice);
 
     return hlen;
 }
@@ -77,7 +77,7 @@ int w_compute_filters(const char* wname, int direction, int do_swt) {
 
 
 // must be run with grid size = (Nc/2, Nr/2)  where Nr = numrows of input image
-__global__ void w_kern_forward(float* img, float* c_a, float* c_h, float* c_v, float* c_d, int Nr, int Nc, int hlen) {
+__global__ void w_kern_forward(DTYPE* img, DTYPE* c_a, DTYPE* c_h, DTYPE* c_v, DTYPE* c_d, int Nr, int Nc, int hlen) {
     int gidx = threadIdx.x + blockIdx.x*blockDim.x;
     int gidy = threadIdx.y + blockIdx.y*blockDim.y;
     int Nr2 = Nr/2, Nc2 = Nc/2;
@@ -97,8 +97,8 @@ __global__ void w_kern_forward(float* img, float* c_a, float* c_h, float* c_v, f
         int jy2 = Nr - 1 - 2*gidy + c;
         int jx1 = c - 2*gidx;
         int jx2 = Nc - 1 - 2*gidx + c;
-        float res_a = 0, res_h = 0, res_v = 0, res_d = 0;
-        float img_val;
+        DTYPE res_a = 0, res_h = 0, res_v = 0, res_d = 0;
+        DTYPE img_val;
 
         // Convolution with periodic boundaries extension.
         // The following can be sped-up by splitting into 3*3 loops, but it would be a nightmare for readability
@@ -129,7 +129,7 @@ __global__ void w_kern_forward(float* img, float* c_a, float* c_h, float* c_v, f
 
 
 // must be run with grid size = (2*Nr, 2*Nc) ; Nr = numrows of input
-__global__ void w_kern_inverse(float* img, float* c_a, float* c_h, float* c_v, float* c_d, int Nr, int Nc, int hlen) {
+__global__ void w_kern_inverse(DTYPE* img, DTYPE* c_a, DTYPE* c_h, DTYPE* c_v, DTYPE* c_d, int Nr, int Nc, int hlen) {
     int gidx = threadIdx.x + blockIdx.x*blockDim.x;
     int gidy = threadIdx.y + blockIdx.y*blockDim.y;
     int Nr2 = Nr*2, Nc2 = Nc*2;
@@ -161,7 +161,7 @@ __global__ void w_kern_inverse(float* img, float* c_a, float* c_h, float* c_v, f
         int offset_x = 1-(gidx & 1);
         int offset_y = 1-(gidy & 1);
 
-        float res_a = 0, res_h = 0, res_v = 0, res_d = 0;
+        DTYPE res_a = 0, res_h = 0, res_v = 0, res_d = 0;
         for (int jy = 0; jy <= hR+hL; jy++) {
             int idx_y = gidy/2 - c + jy;
             if (jy < jy1) idx_y += Nr;
@@ -188,12 +188,12 @@ __global__ void w_kern_inverse(float* img, float* c_a, float* c_h, float* c_v, f
 
 
 
-int w_forward(float* d_image, float** d_coeffs, float* d_tmp, w_info winfos) {
+int w_forward(DTYPE* d_image, DTYPE** d_coeffs, DTYPE* d_tmp, w_info winfos) {
 
     int Nr = winfos.Nr, Nc = winfos.Nc, levels = winfos.nlevels, hlen = winfos.hlen;
     int tpb = 16; // TODO : tune for max perfs.
     int Nc2 = Nc/2, Nr2 = Nr/2;
-    float* d_tmp1, *d_tmp2;
+    DTYPE* d_tmp1, *d_tmp2;
     d_tmp1 = d_coeffs[0];
     d_tmp2 = d_tmp;
 
@@ -209,19 +209,19 @@ int w_forward(float* d_image, float** d_coeffs, float* d_tmp, w_info winfos) {
         w_kern_forward<<<n_blocks, n_threads_per_block>>>(d_tmp1, d_tmp2, d_coeffs[3*i+1], d_coeffs[3*i+2], d_coeffs[3*i+3], Nr2*2, Nc2*2, hlen);
         w_swap_ptr(&d_tmp1, &d_tmp2);
     }
-    if ((levels & 1) == 0) cudaMemcpy(d_coeffs[0], d_tmp, Nr2*Nc2*sizeof(float), cudaMemcpyDeviceToDevice);
+    if ((levels & 1) == 0) cudaMemcpy(d_coeffs[0], d_tmp, Nr2*Nc2*sizeof(DTYPE), cudaMemcpyDeviceToDevice);
     return 0;
 }
 
 
-int w_inverse(float* d_image, float** d_coeffs, float* d_tmp, w_info winfos) {
+int w_inverse(DTYPE* d_image, DTYPE** d_coeffs, DTYPE* d_tmp, w_info winfos) {
     int Nr = winfos.Nr, Nc = winfos.Nc, levels = winfos.nlevels, hlen = winfos.hlen;
     int Nr0 = Nr, Nc0 = Nc;
     Nr /= w_ipow2(levels);
     Nc /= w_ipow2(levels);
     int tpb = 16; // TODO : tune for max perfs.
 
-    float* d_tmp1, *d_tmp2;
+    DTYPE* d_tmp1, *d_tmp2;
     d_tmp1 = d_coeffs[0];
     d_tmp2 = d_tmp;
 
@@ -234,7 +234,7 @@ int w_inverse(float* d_image, float** d_coeffs, float* d_tmp, w_info winfos) {
         Nc *= 2;
         w_swap_ptr(&d_tmp1, &d_tmp2);
     }
-    if ((levels & 1) == 0) cudaMemcpy(d_coeffs[0], d_tmp, (Nr0/2)*(Nc0/2)*sizeof(float), cudaMemcpyDeviceToDevice);
+    if ((levels & 1) == 0) cudaMemcpy(d_coeffs[0], d_tmp, (Nr0/2)*(Nc0/2)*sizeof(DTYPE), cudaMemcpyDeviceToDevice);
     //~ CUDACHECK;
     // First level
     n_blocks = dim3(w_iDivUp(Nc*2, tpb), w_iDivUp(Nr*2, tpb), 1);
@@ -254,7 +254,7 @@ int w_inverse(float* d_image, float** d_coeffs, float* d_tmp, w_info winfos) {
 
 
 // must be run with grid size = (Nc, Nr)  where Nr = numrows of input image
-__global__ void w_kern_forward_swt(float* img, float* c_a, float* c_h, float* c_v, float* c_d, int Nr, int Nc, int hlen, int level) {
+__global__ void w_kern_forward_swt(DTYPE* img, DTYPE* c_a, DTYPE* c_h, DTYPE* c_v, DTYPE* c_d, int Nr, int Nc, int hlen, int level) {
     int gidx = threadIdx.x + blockIdx.x*blockDim.x;
     int gidy = threadIdx.y + blockIdx.y*blockDim.y;
     if (gidy < Nr && gidx < Nc) {
@@ -277,8 +277,8 @@ __global__ void w_kern_forward_swt(float* img, float* c_a, float* c_h, float* c_
         int jx2 = Nc - 1 - gidx + c;
         int jy1 = c - gidy;
         int jy2 = Nr - 1 - gidy + c;
-        float res_a = 0, res_h = 0, res_v = 0, res_d = 0;
-        float img_val;
+        DTYPE res_a = 0, res_h = 0, res_v = 0, res_d = 0;
+        DTYPE img_val;
 
         // Convolution with periodic boundaries extension.
         // The filters are 2-upsampled at each level : [h0, h1, h2, h3] --> [h0, 0, h1, 0, h2, 0, h3, 0]
@@ -310,7 +310,7 @@ __global__ void w_kern_forward_swt(float* img, float* c_a, float* c_h, float* c_
 
 
 // must be run with grid size = (2*Nr, 2*Nc) ; Nr = numrows of input
-__global__ void w_kern_inverse_swt(float* img, float* c_a, float* c_h, float* c_v, float* c_d, int Nr, int Nc, int hlen, int level) {
+__global__ void w_kern_inverse_swt(DTYPE* img, DTYPE* c_a, DTYPE* c_h, DTYPE* c_v, DTYPE* c_d, int Nr, int Nc, int hlen, int level) {
     int gidx = threadIdx.x + blockIdx.x*blockDim.x;
     int gidy = threadIdx.y + blockIdx.y*blockDim.y;
     if (gidy < Nr && gidx < Nc) {
@@ -333,7 +333,7 @@ __global__ void w_kern_inverse_swt(float* img, float* c_a, float* c_h, float* c_
         int jx1 = c - gidx;
         int jx2 = Nc - 1 - gidx + c;
 
-        float res_a = 0, res_h = 0, res_v = 0, res_d = 0;
+        DTYPE res_a = 0, res_h = 0, res_v = 0, res_d = 0;
         for (int jy = 0; jy <= hR+hL; jy++) {
             int idx_y = gidy - c + jy*factor;
             if (factor*jy < jy1) idx_y += Nr;
@@ -358,10 +358,10 @@ __global__ void w_kern_inverse_swt(float* img, float* c_a, float* c_h, float* c_
 
 
 
-int w_forward_swt(float* d_image, float** d_coeffs, float* d_tmp, w_info winfos) {
+int w_forward_swt(DTYPE* d_image, DTYPE** d_coeffs, DTYPE* d_tmp, w_info winfos) {
     int Nr = winfos.Nr, Nc = winfos.Nc, levels = winfos.nlevels, hlen = winfos.hlen;
 
-    float* d_tmp1, *d_tmp2;
+    DTYPE* d_tmp1, *d_tmp2;
     d_tmp1 = d_coeffs[0];
     d_tmp2 = d_tmp;
 
@@ -374,15 +374,15 @@ int w_forward_swt(float* d_image, float** d_coeffs, float* d_tmp, w_info winfos)
         w_kern_forward_swt<<<n_blocks, n_threads_per_block>>>(d_tmp1, d_tmp2, d_coeffs[3*i+1], d_coeffs[3*i+2], d_coeffs[3*i+3], Nr, Nc, hlen, i+1);
         w_swap_ptr(&d_tmp1, &d_tmp2);
     }
-    if ((levels & 1) == 0) cudaMemcpy(d_coeffs[0], d_tmp, Nr*Nc*sizeof(float), cudaMemcpyDeviceToDevice);
+    if ((levels & 1) == 0) cudaMemcpy(d_coeffs[0], d_tmp, Nr*Nc*sizeof(DTYPE), cudaMemcpyDeviceToDevice);
     return 0;
 }
 
 
 
-int w_inverse_swt(float* d_image, float** d_coeffs, float* d_tmp, w_info winfos) {
+int w_inverse_swt(DTYPE* d_image, DTYPE** d_coeffs, DTYPE* d_tmp, w_info winfos) {
     int Nr = winfos.Nr, Nc = winfos.Nc, levels = winfos.nlevels, hlen = winfos.hlen;
-    float* d_tmp1, *d_tmp2;
+    DTYPE* d_tmp1, *d_tmp2;
     d_tmp1 = d_coeffs[0];
     d_tmp2 = d_tmp;
 
@@ -393,7 +393,7 @@ int w_inverse_swt(float* d_image, float** d_coeffs, float* d_tmp, w_info winfos)
         w_kern_inverse_swt<<<n_blocks, n_threads_per_block>>>(d_tmp2, d_tmp1, d_coeffs[3*i+1], d_coeffs[3*i+2], d_coeffs[3*i+3], Nr, Nc, hlen, i+1);
         w_swap_ptr(&d_tmp1, &d_tmp2);
     }
-    if ((levels & 1) == 0) cudaMemcpy(d_coeffs[0], d_tmp, Nr*Nc*sizeof(float), cudaMemcpyDeviceToDevice);
+    if ((levels & 1) == 0) cudaMemcpy(d_coeffs[0], d_tmp, Nr*Nc*sizeof(DTYPE), cudaMemcpyDeviceToDevice);
     // First scale
     n_blocks = dim3(w_iDivUp(Nc, tpb), w_iDivUp(Nr, tpb), 1);
     w_kern_inverse_swt<<<n_blocks, n_threads_per_block>>>(d_image, d_coeffs[0], d_coeffs[1], d_coeffs[2], d_coeffs[3], Nr, Nc, hlen, 1);

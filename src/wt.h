@@ -17,9 +17,9 @@ class Wavelets {
   public:
     // Members
     // --------
-    float* d_image;         // Image (input or result of reconstruction), on device
-    float** d_coeffs;       // Wavelet coefficients, on device
-    float* d_tmp;           // Temporary device array (to avoid multiple malloc/free)
+    DTYPE* d_image;         // Image (input or result of reconstruction), on device
+    DTYPE** d_coeffs;       // Wavelet coefficients, on device
+    DTYPE* d_tmp;           // Temporary device array (to avoid multiple malloc/free)
 
     int current_shift_r;
     int current_shift_c;
@@ -35,11 +35,11 @@ class Wavelets {
     // Default constructor
     Wavelets();
     // Constructor : Wavelets from image
-    Wavelets(float* img, int Nr, int Nc, const char* wname, int levels, int memisonhost=1, int do_separable=1, int do_cycle_spinning=0, int do_swt=0, int ndim=2);
+    Wavelets(DTYPE* img, int Nr, int Nc, const char* wname, int levels, int memisonhost=1, int do_separable=1, int do_cycle_spinning=0, int do_swt=0, int ndim=2);
     // Constructor: copy
     Wavelets(const Wavelets &W);// Pass by non-const reference ONLY if the function will modify the parameter and it is the intent to change the caller's copy of the data
     // Constructor : Wavelets from coeffs
-    //~ Wavelets(float** d_thecoeffs, int Nr, int Nc, const char* wname, int levels, int do_cycle_spinning);
+    //~ Wavelets(DTYPE** d_thecoeffs, int Nr, int Nc, const char* wname, int levels, int do_cycle_spinning);
     // Destructor
     ~Wavelets();
     // Assignment (copy assignment constructor)
@@ -49,22 +49,22 @@ class Wavelets {
     // Methods
     // -------
     void forward();
-    void soft_threshold(float beta, int do_thresh_appcoeffs = 0, int normalize = 0, int threshold_cousins = 0);
-    void hard_threshold(float beta, int do_thresh_appcoeffs = 0, int normalize = 0);
-    void shrink(float beta, int do_thresh_appcoeffs = 1);
+    void soft_threshold(DTYPE beta, int do_thresh_appcoeffs = 0, int normalize = 0, int threshold_cousins = 0);
+    void hard_threshold(DTYPE beta, int do_thresh_appcoeffs = 0, int normalize = 0);
+    void shrink(DTYPE beta, int do_thresh_appcoeffs = 1);
     void circshift(int sr, int sc, int inplace = 1);
     void inverse();
-    float norm2sq();
-    float norm1();
-    int get_image(float* img);
+    DTYPE norm2sq();
+    DTYPE norm1();
+    int get_image(DTYPE* img);
     void print_informations();
-    int get_coeff(float* coeff, int num);
-    void set_image(float* img, int mem_is_on_device = 0);
-    void set_coeff(float* coeff, int num, int mem_is_on_device = 0);
-    int set_filters_forward(int len, float* filter1, float* filter2, float* filter3 = NULL, float* filter4 = NULL);
-    int set_filters_inverse(float* filter1, float* filter2, float* filter3 = NULL, float* filter4 = NULL);
+    int get_coeff(DTYPE* coeff, int num);
+    void set_image(DTYPE* img, int mem_is_on_device = 0);
+    void set_coeff(DTYPE* coeff, int num, int mem_is_on_device = 0);
+    int set_filters_forward(int len, DTYPE* filter1, DTYPE* filter2, DTYPE* filter3 = NULL, DTYPE* filter4 = NULL);
+    int set_filters_inverse(DTYPE* filter1, DTYPE* filter2, DTYPE* filter3 = NULL, DTYPE* filter4 = NULL);
 
-    int add_wavelet(Wavelets W, float alpha=1.0f);
+    int add_wavelet(Wavelets W, DTYPE alpha=1.0f);
 };
 
 

@@ -6,7 +6,7 @@
 /// Returns : the filter width "hlen" if success ; a negative value otherwise.
 int w_compute_filters_separable(const char* wname, int do_swt) {
     int hlen = 0;
-    float* f1_l, *f1_h, *f1_il, *f1_ih;
+    DTYPE* f1_l, *f1_h, *f1_il, *f1_ih;
 
     // Haar filters has specific kernels
     if (!do_swt) {
@@ -33,10 +33,10 @@ int w_compute_filters_separable(const char* wname, int do_swt) {
     }
 
     // Copy the filters to device constant memory
-    cudaMemcpyToSymbol(c_kern_L, f1_l, hlen*sizeof(float), 0, cudaMemcpyHostToDevice);
-    cudaMemcpyToSymbol(c_kern_H, f1_h, hlen*sizeof(float), 0, cudaMemcpyHostToDevice);
-    cudaMemcpyToSymbol(c_kern_IL, f1_il, hlen*sizeof(float), 0, cudaMemcpyHostToDevice);
-    cudaMemcpyToSymbol(c_kern_IH, f1_ih, hlen*sizeof(float), 0, cudaMemcpyHostToDevice);
+    cudaMemcpyToSymbol(c_kern_L, f1_l, hlen*sizeof(DTYPE), 0, cudaMemcpyHostToDevice);
+    cudaMemcpyToSymbol(c_kern_H, f1_h, hlen*sizeof(DTYPE), 0, cudaMemcpyHostToDevice);
+    cudaMemcpyToSymbol(c_kern_IL, f1_il, hlen*sizeof(DTYPE), 0, cudaMemcpyHostToDevice);
+    cudaMemcpyToSymbol(c_kern_IH, f1_ih, hlen*sizeof(DTYPE), 0, cudaMemcpyHostToDevice);
 
     return hlen;
 }
@@ -54,7 +54,7 @@ int w_compute_filters_separable(const char* wname, int do_swt) {
 
 // must be run with grid size = (Nc/2, Nr)  where Nr = numrows of input image
 // Pass 1 : Input image ==> horizontal convolution with L, H  + horizontal subsampling  ==> (tmp_a1, tmp_a2)
-__global__ void w_kern_forward_pass1(float* img, float* tmp_a1, float* tmp_a2, int Nr, int Nc, int hlen) {
+__global__ void w_kern_forward_pass1(DTYPE* img, DTYPE* tmp_a1, DTYPE* tmp_a2, int Nr, int Nc, int hlen) {
     int gidx = threadIdx.x + blockIdx.x*blockDim.x;
     int gidy = threadIdx.y + blockIdx.y*blockDim.y;
     int Nc2 = Nc/2;
@@ -72,8 +72,8 @@ __global__ void w_kern_forward_pass1(float* img, float* tmp_a1, float* tmp_a2, i
         }
         int jx1 = c - 2*gidx;
         int jx2 = Nc - 1 - 2*gidx + c;
-        float res_tmp_a1 = 0, res_tmp_a2 = 0;
-        float img_val;
+        DTYPE res_tmp_a1 = 0, res_tmp_a2 = 0;
+        DTYPE img_val;
 
         // Convolution with periodic boundaries extension.
         for (int jx = 0; jx <= hR+hL; jx++) {
@@ -92,7 +92,7 @@ __global__ void w_kern_forward_pass1(float* img, float* tmp_a1, float* tmp_a2, i
 
 // must be run with grid size = (Nc/2, Nr/2)  where Nr = numrows of input image. Here Nc is actually halved wrt to Nc_image since there was a horiz subs.
 // Pass 2 : (tmp_a1, tmp_a2) ==>  Vertic convolution on tmp_a1 and tmp_a2 with  L, H  + vertical subsampling ==> (a, h, v, d)
-__global__ void w_kern_forward_pass2(float* tmp_a1, float* tmp_a2, float* c_a, float* c_h, float* c_v, float* c_d, int Nr, int Nc, int hlen) {
+__global__ void w_kern_forward_pass2(DTYPE* tmp_a1, DTYPE* tmp_a2, DTYPE* c_a, DTYPE* c_h, DTYPE* c_v, DTYPE* c_d, int Nr, int Nc, int hlen) {
     int gidx = threadIdx.x + blockIdx.x*blockDim.x;
     int gidy = threadIdx.y + blockIdx.y*blockDim.y;
     int Nr2 = Nr/2;
@@ -110,7 +110,7 @@ __global__ void w_kern_forward_pass2(float* tmp_a1, float* tmp_a2, float* c_a, f
         }
         int jy1 = c - gidy*2;
         int jy2 = Nr - 1 - gidy*2 + c;
-        float res_a = 0, res_h = 0, res_v = 0, res_d = 0;
+        DTYPE res_a = 0, res_h = 0, res_v = 0, res_d = 0;
 
         // Convolution with periodic boundaries extension.
         for (int jy = 0; jy <= hR+hL; jy++) {
@@ -132,10 +132,10 @@ __global__ void w_kern_forward_pass2(float* tmp_a1, float* tmp_a2, float* c_a, f
 }
 
 
-int w_forward_separable(float* d_image, float** d_coeffs, float* d_tmp, w_info winfos) {
+int w_forward_separable(DTYPE* d_image, DTYPE** d_coeffs, DTYPE* d_tmp, w_info winfos) {
     int Nr = winfos.Nr, Nc = winfos.Nc, levels = winfos.nlevels, hlen = winfos.hlen;
-    float* d_tmp1 = d_tmp;
-    float* d_tmp2 = d_tmp + Nr*Nc/2;
+    DTYPE* d_tmp1 = d_tmp;
+    DTYPE* d_tmp2 = d_tmp + Nr*Nc/2;
 
     // First level
     int tpb = 16; // TODO : tune for max perfs.
@@ -162,10 +162,10 @@ int w_forward_separable(float* d_image, float** d_coeffs, float* d_tmp, w_info w
 
 
 // (batched) 1D transform. It boils down to the 2D separable transform without the second pass.
-int w_forward_separable_1d(float* d_image, float** d_coeffs, float* d_tmp, w_info winfos) {
+int w_forward_separable_1d(DTYPE* d_image, DTYPE** d_coeffs, DTYPE* d_tmp, w_info winfos) {
     int Nr = winfos.Nr, Nc = winfos.Nc, levels = winfos.nlevels, hlen = winfos.hlen;
-    float* d_tmp1 = d_coeffs[0];
-    float* d_tmp2 = d_tmp;
+    DTYPE* d_tmp1 = d_coeffs[0];
+    DTYPE* d_tmp2 = d_tmp;
     // First level
     int tpb = 16; // TODO : tune for max perfs.
     int Nc2 = Nc/2;
@@ -179,7 +179,7 @@ int w_forward_separable_1d(float* d_image, float** d_coeffs, float* d_tmp, w_inf
         w_kern_forward_pass1<<<n_blocks, n_threads_per_block>>>(d_tmp1, d_tmp2, d_coeffs[i+1], Nr, Nc2*2, hlen);
         w_swap_ptr(&d_tmp1, &d_tmp2);
     }
-    if ((levels & 1) == 0) cudaMemcpy(d_coeffs[0], d_tmp, Nr*Nc2*sizeof(float), cudaMemcpyDeviceToDevice);
+    if ((levels & 1) == 0) cudaMemcpy(d_coeffs[0], d_tmp, Nr*Nc2*sizeof(DTYPE), cudaMemcpyDeviceToDevice);
     return 0;
 }
 
@@ -191,7 +191,7 @@ int w_forward_separable_1d(float* d_image, float** d_coeffs, float* d_tmp, w_inf
 
 // must be run with grid size = (Nc, 2*Nr) ; Nr = numrows of input coefficients
 // pass 1 : (a, h, v, d)  ==> Vertical convol with IL, IH  +  vertical oversampling==> (tmp1, tmp2)
-__global__ void w_kern_inverse_pass1(float* c_a, float* c_h, float* c_v, float* c_d, float* tmp1, float* tmp2, int Nr, int Nc, int hlen) {
+__global__ void w_kern_inverse_pass1(DTYPE* c_a, DTYPE* c_h, DTYPE* c_v, DTYPE* c_d, DTYPE* tmp1, DTYPE* tmp2, int Nr, int Nc, int hlen) {
     int gidx = threadIdx.x + blockIdx.x*blockDim.x;
     int gidy = threadIdx.y + blockIdx.y*blockDim.y;
     int Nr2 = Nr*2;
@@ -215,7 +215,7 @@ __global__ void w_kern_inverse_pass1(float* c_a, float* c_h, float* c_v, float* 
         int jy2 = Nr - 1 - gidy/2 + c;
         int offset_y = 1-(gidy & 1);
 
-        float res_a = 0, res_h = 0, res_v = 0, res_d = 0;
+        DTYPE res_a = 0, res_h = 0, res_v = 0, res_d = 0;
         for (int jy = 0; jy <= hR+hL; jy++) {
             int idx_y = gidy/2 - c + jy;
             if (jy < jy1) idx_y += Nr;
@@ -239,7 +239,7 @@ __global__ void w_kern_inverse_pass1(float* c_a, float* c_h, float* c_v, float* 
 
 // must be run with grid size = (2*Nr, 2*Nc) ; Nc = numcols of input coeffs. Here the param Nr is actually doubled wrt Nr_coeffs because of the vertical oversampling.
 // pass 2 : (tmp1, tmp2)  ==> Horiz convol with IL, IH  + horiz oversampling ==> I
-__global__ void w_kern_inverse_pass2(float* tmp1, float* tmp2, float* img, int Nr, int Nc, int hlen) {
+__global__ void w_kern_inverse_pass2(DTYPE* tmp1, DTYPE* tmp2, DTYPE* img, int Nr, int Nc, int hlen) {
     int gidx = threadIdx.x + blockIdx.x*blockDim.x;
     int gidy = threadIdx.y + blockIdx.y*blockDim.y;
     int Nc2 = Nc*2;
@@ -263,7 +263,7 @@ __global__ void w_kern_inverse_pass2(float* tmp1, float* tmp2, float* img, int N
         int jx2 = Nc - 1 - gidx/2 + c;
         int offset_x = 1-(gidx & 1);
 
-        float res_1 = 0, res_2 = 0;
+        DTYPE res_1 = 0, res_2 = 0;
         for (int jx = 0; jx <= hR+hL; jx++) {
             int idx_x = gidx/2 - c + jx;
             if (jx < jx1) idx_x += Nc;
@@ -278,10 +278,10 @@ __global__ void w_kern_inverse_pass2(float* tmp1, float* tmp2, float* img, int N
 }
 
 
-int w_inverse_separable(float* d_image, float** d_coeffs, float* d_tmp, w_info winfos) {
+int w_inverse_separable(DTYPE* d_image, DTYPE** d_coeffs, DTYPE* d_tmp, w_info winfos) {
     int Nr = winfos.Nr, Nc = winfos.Nc, levels = winfos.nlevels, hlen = winfos.hlen;
-    float* d_tmp1 = d_tmp;
-    float* d_tmp2 = d_tmp + Nr*Nc/2;
+    DTYPE* d_tmp1 = d_tmp;
+    DTYPE* d_tmp2 = d_tmp + Nr*Nc/2;
 
     Nr /= w_ipow2(levels);
     Nc /= w_ipow2(levels);
@@ -310,10 +310,10 @@ int w_inverse_separable(float* d_image, float** d_coeffs, float* d_tmp, w_info w
 
 
 // (batched) 1D inverse transform. Boils down to 2D separable transform without the first pass.
-int w_inverse_separable_1d(float* d_image, float** d_coeffs, float* d_tmp, w_info winfos) {
+int w_inverse_separable_1d(DTYPE* d_image, DTYPE** d_coeffs, DTYPE* d_tmp, w_info winfos) {
     int Nr = winfos.Nr, Nc = winfos.Nc, levels = winfos.nlevels, hlen = winfos.hlen;
-    float* d_tmp1 = d_coeffs[0];
-    float* d_tmp2 = d_tmp;
+    DTYPE* d_tmp1 = d_coeffs[0];
+    DTYPE* d_tmp2 = d_tmp;
     Nc /= w_ipow2(levels);
 
     int tpb = 16; // TODO : tune for max perfs.
@@ -327,7 +327,7 @@ int w_inverse_separable_1d(float* d_image, float** d_coeffs, float* d_tmp, w_inf
         Nc2 *= 2;
         w_swap_ptr(&d_tmp1, &d_tmp2);
     }
-    if ((levels & 1) == 0) cudaMemcpy(d_coeffs[0], d_tmp, Nr*Nc2/2*sizeof(float), cudaMemcpyDeviceToDevice);
+    if ((levels & 1) == 0) cudaMemcpy(d_coeffs[0], d_tmp, Nr*Nc2/2*sizeof(DTYPE), cudaMemcpyDeviceToDevice);
     // First scale
     n_blocks = dim3(w_iDivUp(Nc2, tpb), w_iDivUp(Nr, tpb), 1);
     w_kern_inverse_pass2<<<n_blocks, n_threads_per_block>>>(d_coeffs[0], d_coeffs[1], d_image, Nr, Nc2/2, hlen);
@@ -347,7 +347,7 @@ int w_inverse_separable_1d(float* d_image, float** d_coeffs, float* d_tmp, w_inf
 
 // must be run with grid size = (Nc, Nr)  where Nr = numrows of input image
 // Pass 1 : Input image ==> horizontal convolution with L, H  ==> (tmp_a1, tmp_a2)
-__global__ void w_kern_forward_swt_pass1(float* img, float* tmp_a1, float* tmp_a2, int Nr, int Nc, int hlen, int level) {
+__global__ void w_kern_forward_swt_pass1(DTYPE* img, DTYPE* tmp_a1, DTYPE* tmp_a2, int Nr, int Nc, int hlen, int level) {
     int gidx = threadIdx.x + blockIdx.x*blockDim.x;
     int gidy = threadIdx.y + blockIdx.y*blockDim.y;
     if (gidy < Nr && gidx < Nc) {
@@ -368,8 +368,8 @@ __global__ void w_kern_forward_swt_pass1(float* img, float* tmp_a1, float* tmp_a
         c *= factor;
         int jx1 = c - gidx;
         int jx2 = Nc - 1 - gidx + c;
-        float res_tmp_a1 = 0, res_tmp_a2 = 0;
-        float img_val;
+        DTYPE res_tmp_a1 = 0, res_tmp_a2 = 0;
+        DTYPE img_val;
 
         // Convolution with periodic boundaries extension.
         // The filters are 2-upsampled at each level : [h0, h1, h2, h3] --> [h0, 0, h1, 0, h2, 0, h3, 0]
@@ -390,7 +390,7 @@ __global__ void w_kern_forward_swt_pass1(float* img, float* tmp_a1, float* tmp_a
 
 // must be run with grid size = (Nc, Nr)  where Nr = numrows of input image
 // Pass 2 : (tmp_a1, tmp_a2) ==>  Vertic convolution on tmp_a1 and tmp_a2 with  L, H  ==> (a, h, v, d)
-__global__ void w_kern_forward_swt_pass2(float* tmp_a1, float* tmp_a2, float* c_a, float* c_h, float* c_v, float* c_d, int Nr, int Nc, int hlen, int level) {
+__global__ void w_kern_forward_swt_pass2(DTYPE* tmp_a1, DTYPE* tmp_a2, DTYPE* c_a, DTYPE* c_h, DTYPE* c_v, DTYPE* c_d, int Nr, int Nc, int hlen, int level) {
     int gidx = threadIdx.x + blockIdx.x*blockDim.x;
     int gidy = threadIdx.y + blockIdx.y*blockDim.y;
     if (gidy < Nr && gidx < Nc) {
@@ -411,7 +411,7 @@ __global__ void w_kern_forward_swt_pass2(float* tmp_a1, float* tmp_a2, float* c_
         c *= factor;
         int jy1 = c - gidy;
         int jy2 = Nr - 1 - gidy + c;
-        float res_a = 0, res_h = 0, res_v = 0, res_d = 0;
+        DTYPE res_a = 0, res_h = 0, res_v = 0, res_d = 0;
 
         // Convolution with periodic boundaries extension.
         // The filters are 2-upsampled at each level : [h0, h1, h2, h3] --> [h0, 0, h1, 0, h2, 0, h3, 0]
@@ -434,11 +434,11 @@ __global__ void w_kern_forward_swt_pass2(float* tmp_a1, float* tmp_a2, float* c_
 }
 
 
-int w_forward_swt_separable(float* d_image, float** d_coeffs, float* d_tmp, w_info winfos) {
+int w_forward_swt_separable(DTYPE* d_image, DTYPE** d_coeffs, DTYPE* d_tmp, w_info winfos) {
     int Nr = winfos.Nr, Nc = winfos.Nc, levels = winfos.nlevels, hlen = winfos.hlen;
 
-    float* d_tmp1 = d_tmp;
-    float* d_tmp2 = d_tmp + Nr*Nc;
+    DTYPE* d_tmp1 = d_tmp;
+    DTYPE* d_tmp2 = d_tmp + Nr*Nc;
 
     int tpb = 16; // TODO : tune for max perfs.
     dim3 n_blocks_1 = dim3(w_iDivUp(Nc, tpb), w_iDivUp(Nr, tpb), 1);
@@ -457,11 +457,11 @@ int w_forward_swt_separable(float* d_image, float** d_coeffs, float* d_tmp, w_in
 
 
 // (batched) 1D forward SWT. Boils down to 2D non-separable transform without the second pass.
-int w_forward_swt_separable_1d(float* d_image, float** d_coeffs, float* d_tmp, w_info winfos) {
+int w_forward_swt_separable_1d(DTYPE* d_image, DTYPE** d_coeffs, DTYPE* d_tmp, w_info winfos) {
     int Nr = winfos.Nr, Nc = winfos.Nc, levels = winfos.nlevels, hlen = winfos.hlen;
 
-    float* d_tmp1 = d_coeffs[0];
-    float* d_tmp2 = d_tmp;
+    DTYPE* d_tmp1 = d_coeffs[0];
+    DTYPE* d_tmp2 = d_tmp;
 
     int tpb = 16; // TODO : tune for max perfs.
     dim3 n_blocks = dim3(w_iDivUp(Nc, tpb), w_iDivUp(Nr, tpb), 1);
@@ -473,7 +473,7 @@ int w_forward_swt_separable_1d(float* d_image, float** d_coeffs, float* d_tmp, w
         w_kern_forward_swt_pass1<<<n_blocks, n_threads_per_block>>>(d_tmp1, d_tmp2, d_coeffs[i+1], Nr, Nc, hlen, i+1);
         w_swap_ptr(&d_tmp1, &d_tmp2);
     }
-    if ((levels & 1) == 0) cudaMemcpy(d_coeffs[0], d_tmp, Nr*Nc*sizeof(float), cudaMemcpyDeviceToDevice);
+    if ((levels & 1) == 0) cudaMemcpy(d_coeffs[0], d_tmp, Nr*Nc*sizeof(DTYPE), cudaMemcpyDeviceToDevice);
     return 0;
 }
 
@@ -491,7 +491,7 @@ int w_forward_swt_separable_1d(float* d_image, float** d_coeffs, float* d_tmp, w
 
 // must be run with grid size = (Nc, Nr) ; Nr = numrows of input coefficients
 // pass 1 : (a, h, v, d)  ==> Vertical convol with IL, IH  ==> (tmp1, tmp2)
-__global__ void w_kern_inverse_swt_pass1(float* c_a, float* c_h, float* c_v, float* c_d, float* tmp1, float* tmp2, int Nr, int Nc, int hlen, int level) {
+__global__ void w_kern_inverse_swt_pass1(DTYPE* c_a, DTYPE* c_h, DTYPE* c_v, DTYPE* c_d, DTYPE* tmp1, DTYPE* tmp2, int Nr, int Nc, int hlen, int level) {
     int gidx = threadIdx.x + blockIdx.x*blockDim.x;
     int gidy = threadIdx.y + blockIdx.y*blockDim.y;
     if (gidy < Nr && gidx < Nc) { // vertic oversampling : Input (Nr, Nc) => Output (Nr*2, Nc)
@@ -513,7 +513,7 @@ __global__ void w_kern_inverse_swt_pass1(float* c_a, float* c_h, float* c_v, flo
         int offset_y = 1-(gidy & 1);
         offset_y = 0;
 
-        float res_a = 0, res_h = 0, res_v = 0, res_d = 0;
+        DTYPE res_a = 0, res_h = 0, res_v = 0, res_d = 0;
         for (int jy = 0; jy <= hR+hL; jy++) {
             int idx_y = gidy - c + factor*jy;
             if (factor*jy < jy1) idx_y += Nr;
@@ -531,7 +531,7 @@ __global__ void w_kern_inverse_swt_pass1(float* c_a, float* c_h, float* c_v, flo
 
 // must be run with grid size = (Nr, Nc) ; Nc = numcols of input coeffs.
 // pass 2 : (tmp1, tmp2)  ==> Horiz convol with IL, IH  ==> I
-__global__ void w_kern_inverse_swt_pass2(float* tmp1, float* tmp2, float* img, int Nr, int Nc, int hlen, int level) {
+__global__ void w_kern_inverse_swt_pass2(DTYPE* tmp1, DTYPE* tmp2, DTYPE* img, int Nr, int Nc, int hlen, int level) {
     int gidx = threadIdx.x + blockIdx.x*blockDim.x;
     int gidy = threadIdx.y + blockIdx.y*blockDim.y;
     if (gidy < Nr && gidx < Nc) { // horiz oversampling : Input (Nr*2, Nc) => Output (Nr*2, Nc*2)
@@ -553,7 +553,7 @@ __global__ void w_kern_inverse_swt_pass2(float* tmp1, float* tmp2, float* img, i
         int offset_x = 1-(gidx & 1);
         offset_x = 0;
 
-        float res_1 = 0, res_2 = 0;
+        DTYPE res_1 = 0, res_2 = 0;
         for (int jx = 0; jx <= hR+hL; jx++) {
             int idx_x = gidx - c + factor*jx;
             if (factor*jx < jx1) idx_x += Nc;
@@ -567,11 +567,11 @@ __global__ void w_kern_inverse_swt_pass2(float* tmp1, float* tmp2, float* img, i
 }
 
 
-int w_inverse_swt_separable(float* d_image, float** d_coeffs, float* d_tmp, w_info winfos) {
+int w_inverse_swt_separable(DTYPE* d_image, DTYPE** d_coeffs, DTYPE* d_tmp, w_info winfos) {
 
     int Nr = winfos.Nr, Nc = winfos.Nc, levels = winfos.nlevels, hlen = winfos.hlen;
-    float* d_tmp1 = d_tmp;
-    float* d_tmp2 = d_tmp + Nr*Nc;
+    DTYPE* d_tmp1 = d_tmp;
+    DTYPE* d_tmp2 = d_tmp + Nr*Nc;
 
     int tpb = 16; // TODO : tune for max perfs.
     dim3 n_blocks_1 = dim3(w_iDivUp(Nc, tpb), w_iDivUp(Nr, tpb), 1);
@@ -591,11 +591,11 @@ int w_inverse_swt_separable(float* d_image, float** d_coeffs, float* d_tmp, w_in
 
 
 // (batched) 1D inverse SWT. Boils down to 2D non-separable transform without the first pass.
-int w_inverse_swt_separable_1d(float* d_image, float** d_coeffs, float* d_tmp, w_info winfos) {
+int w_inverse_swt_separable_1d(DTYPE* d_image, DTYPE** d_coeffs, DTYPE* d_tmp, w_info winfos) {
 
     int Nr = winfos.Nr, Nc = winfos.Nc, levels = winfos.nlevels, hlen = winfos.hlen;
-    float* d_tmp1 = d_coeffs[0];
-    float* d_tmp2 = d_tmp;
+    DTYPE* d_tmp1 = d_coeffs[0];
+    DTYPE* d_tmp2 = d_tmp;
 
     int tpb = 16; // TODO : tune for max perfs.
     dim3 n_blocks = dim3(w_iDivUp(Nc, tpb), w_iDivUp(Nr, tpb), 1);
@@ -605,7 +605,7 @@ int w_inverse_swt_separable_1d(float* d_image, float** d_coeffs, float* d_tmp, w
         w_kern_inverse_swt_pass2<<<n_blocks, n_threads_per_block>>>(d_tmp1, d_coeffs[i+1], d_tmp2, Nr, Nc, hlen, i+1);
         w_swap_ptr(&d_tmp1, &d_tmp2);
     }
-    if ((levels & 1) == 0) cudaMemcpy(d_coeffs[0], d_tmp, Nr*Nc*sizeof(float), cudaMemcpyDeviceToDevice);
+    if ((levels & 1) == 0) cudaMemcpy(d_coeffs[0], d_tmp, Nr*Nc*sizeof(DTYPE), cudaMemcpyDeviceToDevice);
     // First scale
     w_kern_inverse_swt_pass2<<<n_blocks, n_threads_per_block>>>(d_coeffs[0], d_coeffs[1], d_image, Nr, Nc, hlen, 1);
 

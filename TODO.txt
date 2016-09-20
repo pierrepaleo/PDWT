@@ -1,12 +1,5 @@
 TODO LIST
 
-- Refactoring [ALMOST DONE]:
-    - Create a structure containing informations on WT. Used by Wavelets() class, but also by common functions (to avoid kilometers-long functions signature)
-    - Not all files in same folder (test, src, doc, build)
-    - Remove useless files (profiling) and put i/o in "test"
-    - No more #include "*.cu" !
-- TYPE template to support both double and simple precision [IN PROGRESS]
-
 - Modify inverse haar (and related) to avoid extra memcpy
 - DWT: Image padding for non-friendly sizes (with warning)
 - Nonseparable SWT re-computes the inverse filters at each inversion (for memory requirements). See if there is a workaround.
@@ -16,4 +9,12 @@ TODO LIST
 - User-defined target CUDA device
 - Documentation/Howtos
 
+-- DONE :
+
+- Refactoring [OK]:
+    - Create a structure containing informations on WT. Used by Wavelets() class, but also by common functions (to avoid kilometers-long functions signature)
+    - Not all files in same folder (test, src, doc, build)
+    - Remove useless files (profiling) and put i/o in "test"
+    - No more #include "*.cu" !
+- TYPE template to support both double and simple precision [OK]
 

@@ -7,22 +7,22 @@
 #include <string.h>
 #include "io.h"
 
-float* read_dat_file_float(const char* fname, int len) {
+DTYPE* read_dat_file_DTYPE(const char* fname, int len) {
     FILE* fid = fopen(fname, "rb");
     if (fid == NULL) {
-        printf("ERROR in read_dat_file_float(): could not read %s\n", fname);
+        printf("ERROR in read_dat_file_DTYPE(): could not read %s\n", fname);
         return NULL;
     }
-    float* out = (float*) calloc(len, sizeof(float));
-    fread(out, len, sizeof(float), fid);
+    DTYPE* out = (DTYPE*) calloc(len, sizeof(DTYPE));
+    fread(out, len, sizeof(DTYPE), fid);
     fclose(fid);
     return out;
 }
 
-void write_dat_file_float(const char* fname, float* arr, int len) {
+void write_dat_file_DTYPE(const char* fname, DTYPE* arr, int len) {
     FILE* fid = fopen(fname, "wb");
     if (fid == NULL) return;
-    fwrite(arr, len, sizeof(float), fid);
+    fwrite(arr, len, sizeof(DTYPE), fid);
     fclose(fid);
 }
 

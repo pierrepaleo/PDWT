@@ -12,6 +12,10 @@ demo:
 libpdwt.so:
 	$(NVCC) --ptxas-options=-v --compiler-options '-fPIC' -o build/$@ --shared $(PDWTCORE) $(CFLAGS) $(LDFLAGS)
 
+# Double precision library
+libpdwtd.so:
+	$(NVCC) --ptxas-options=-v --compiler-options '-fPIC' -o build/$@ --shared -DDOUBLEPRECISION $(PDWTCORE) $(CFLAGS) $(LDFLAGS)
+
 
 %.o: %.cu
 	$(NVCC) -c $(CFLAGS) $<

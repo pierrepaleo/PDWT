@@ -13,50 +13,43 @@
 //  - pre-compute c_kern_inv_XX once for all... faster, but twice more memory is used
 #define MAX_FILTER_WIDTH 40
 
-__constant__ float c_kern_L[MAX_FILTER_WIDTH];
-__constant__ float c_kern_H[MAX_FILTER_WIDTH];
-__constant__ float c_kern_IL[MAX_FILTER_WIDTH];
-__constant__ float c_kern_IH[MAX_FILTER_WIDTH];
+__constant__ DTYPE c_kern_L[MAX_FILTER_WIDTH];
+__constant__ DTYPE c_kern_H[MAX_FILTER_WIDTH];
+__constant__ DTYPE c_kern_IL[MAX_FILTER_WIDTH];
+__constant__ DTYPE c_kern_IH[MAX_FILTER_WIDTH];
 
-__constant__ float c_kern_LL[MAX_FILTER_WIDTH * MAX_FILTER_WIDTH];
-__constant__ float c_kern_LH[MAX_FILTER_WIDTH * MAX_FILTER_WIDTH];
-__constant__ float c_kern_HL[MAX_FILTER_WIDTH * MAX_FILTER_WIDTH];
-__constant__ float c_kern_HH[MAX_FILTER_WIDTH * MAX_FILTER_WIDTH];
+__constant__ DTYPE c_kern_LL[MAX_FILTER_WIDTH * MAX_FILTER_WIDTH];
+__constant__ DTYPE c_kern_LH[MAX_FILTER_WIDTH * MAX_FILTER_WIDTH];
+__constant__ DTYPE c_kern_HL[MAX_FILTER_WIDTH * MAX_FILTER_WIDTH];
+__constant__ DTYPE c_kern_HH[MAX_FILTER_WIDTH * MAX_FILTER_WIDTH];
 
+__global__ void w_kern_soft_thresh(DTYPE* c_h, DTYPE* c_v, DTYPE* c_d, DTYPE beta, int Nr, int Nc);
+__global__ void w_kern_soft_thresh_appcoeffs(DTYPE* c_a, DTYPE beta, int Nr, int Nc);
+__global__ void w_kern_thresh_cousins(DTYPE* c_a, DTYPE* c_h, DTYPE* c_v, DTYPE* c_d, int Nr, int Nc);
 
+__global__ void w_kern_hard_thresh(DTYPE* c_h, DTYPE* c_v, DTYPE* c_d, DTYPE beta, int Nr, int Nc);
+__global__ void w_kern_hard_thresh_appcoeffs(DTYPE* c_a, DTYPE beta, int Nr, int Nc);
 
-__global__ void w_kern_soft_thresh(float* c_h, float* c_v, float* c_d, float beta, int Nr, int Nc);
+__global__ void w_kern_circshift(DTYPE* d_image, DTYPE* d_out, int Nr, int Nc, int sr, int sc);
 
-__global__ void w_kern_soft_thresh_appcoeffs(float* c_a, float beta, int Nr, int Nc);
+void w_call_soft_thresh(DTYPE** d_coeffs, DTYPE beta, w_info winfos, int do_thresh_appcoeffs, int normalize, int threshold_cousins);
+void w_call_hard_thresh(DTYPE** d_coeffs, DTYPE beta, w_info winfos, int do_thresh_appcoeffs, int normalize);
+void w_shrink(DTYPE** d_coeffs, DTYPE beta, w_info winfos, int do_thresh_appcoeffs);
+void w_call_circshift(DTYPE* d_image, DTYPE* d_image2, w_info winfos, int sr, int sc, int inplace = 1);
 
-__global__ void w_kern_hard_thresh(float* c_h, float* c_v, float* c_d, float beta, int Nr, int Nc);
+DTYPE** w_create_coeffs_buffer(w_info winfos);
+void w_free_coeffs_buffer(DTYPE** coeffs, int nlevels);
+void w_copy_coeffs_buffer(DTYPE** dst, DTYPE** src, w_info winfos);
 
-__global__ void w_kern_hard_thresh_appcoeffs(float* c_a, float beta, int Nr, int Nc);
+DTYPE** w_create_coeffs_buffer_1d(w_info winfos);
+void w_free_coeffs_buffer_1d(DTYPE** coeffs, int nlevels);
+void w_copy_coeffs_buffer_1d(DTYPE** dst, DTYPE** src, w_info winfos);
 
-__global__ void w_kern_circshift(float* d_image, float* d_out, int Nr, int Nc, int sr, int sc);
+__global__ void w_kern_hard_thresh_1d(DTYPE* c_d, DTYPE beta, int Nr, int Nc);
+__global__ void w_kern_soft_thresh_1d(DTYPE* c_d, DTYPE beta, int Nr, int Nc);
 
-
-void w_call_soft_thresh(float** d_coeffs, float beta, w_info winfos, int do_thresh_appcoeffs, int normalize, int threshold_cousins);
-
-void w_call_hard_thresh(float** d_coeffs, float beta, w_info winfos, int do_thresh_appcoeffs, int normalize);
-
-void w_shrink(float** d_coeffs, float beta, w_info winfos, int do_thresh_appcoeffs);
-
-void w_call_circshift(float* d_image, float* d_image2, w_info winfos, int sr, int sc, int inplace = 1);
-
-float** w_create_coeffs_buffer(w_info winfos);
-void w_free_coeffs_buffer(float** coeffs, int nlevels);
-void w_copy_coeffs_buffer(float** dst, float** src, w_info winfos);
-
-float** w_create_coeffs_buffer_1d(w_info winfos);
-void w_free_coeffs_buffer_1d(float** coeffs, int nlevels);
-void w_copy_coeffs_buffer_1d(float** dst, float** src, w_info winfos);
-
-__global__ void w_kern_hard_thresh_1d(float* c_d, float beta, int Nr, int Nc);
-__global__ void w_kern_soft_thresh_1d(float* c_d, float beta, int Nr, int Nc);
-
-void w_add_coeffs(float** dst, float** src, w_info winfos, float alpha=1.0f);
-void w_add_coeffs_1d(float** dst, float** src, w_info winfos, float alpha=1.0f);
+void w_add_coeffs(DTYPE** dst, DTYPE** src, w_info winfos, DTYPE alpha=1.0f);
+void w_add_coeffs_1d(DTYPE** dst, DTYPE** src, w_info winfos, DTYPE alpha=1.0f);
 
 
 
