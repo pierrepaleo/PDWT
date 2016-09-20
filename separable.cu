@@ -38,14 +38,6 @@ int w_compute_filters_separable(const char* wname, int do_swt) {
     cudaMemcpyToSymbol(c_kern_IL, f1_il, hlen*sizeof(float), 0, cudaMemcpyHostToDevice);
     cudaMemcpyToSymbol(c_kern_IH, f1_ih, hlen*sizeof(float), 0, cudaMemcpyHostToDevice);
 
-    //DEBUG
-    printf("hlen = %d\n", hlen);
-    for (int i = 0; i < hlen; i++) {
-        printf("%f\n", f1_l[i]);
-    }
-
-
-
     return hlen;
 }
 

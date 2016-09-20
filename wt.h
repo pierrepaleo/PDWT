@@ -17,15 +17,14 @@ class Wavelets {
   public:
     // Members
     // --------
-    float* d_image; // Image (input or result of reconstruction), on device
-    float** d_coeffs; // Wavelet coefficients, on device
-    float* d_tmp; // Temporary device array (to avoid multiple malloc/free)
+    float* d_image;         // Image (input or result of reconstruction), on device
+    float** d_coeffs;       // Wavelet coefficients, on device
+    float* d_tmp;           // Temporary device array (to avoid multiple malloc/free)
 
     int current_shift_r;
     int current_shift_c;
-    int hlen; // Filter length
-    char wname[128]; // Wavelet name
-    int do_separable; // 1 if performing separable WT
+    char wname[128];        // Wavelet name
+    int do_separable;       // 1 if performing separable WT
     int do_cycle_spinning;  // Do image shifting for approximate TI denoising
     w_info winfos;
     w_state state;

@@ -18,4 +18,4 @@ lib:
 	$(NVCC) -c $(CFLAGS) $<
 
 clean:
-	rm -f *.o *.so
+	rm -f demo *.o *.so

@@ -119,16 +119,16 @@ Wavelets::Wavelets(
         else transfer = cudaMemcpyDeviceToDevice;
         cudaMemcpy(d_arr_in, img, Nr*Nc*sizeof(float), transfer);
     }
-    this->d_image = d_arr_in;
+    d_image = d_arr_in;
 
     float* d_tmp_new;
     cudaMalloc(&d_tmp_new, 2*Nr*Nc*sizeof(float)); // Two temp. images
-    this->d_tmp = d_tmp_new;
+    d_tmp = d_tmp_new;
 
     // Dimensions
     if (Nr == 1) { // 1D data
         ndim = 1;
-        this->winfos.ndims = 1;
+        winfos.ndims = 1;
     }
 
     // Coeffs
@@ -139,7 +139,7 @@ Wavelets::Wavelets(
         printf("ERROR: ndim=%d is not implemented\n", ndim);
         exit(1);
     }
-    this->d_coeffs = d_coeffs_new;
+    d_coeffs = d_coeffs_new;
 
     if (ndim == 1 && do_separable == 0) {
         puts("Warning: 1D DWT was requestred, which is incompatible with non-separable transform.");
@@ -155,7 +155,7 @@ Wavelets::Wavelets(
         printf("ERROR: unknown wavelet name %s\n", wname);
         exit(1);
     }
-    this->hlen = hlen;
+    winfos.hlen = hlen;
 
     // Compute max achievable level according to image dimensions and filter size
     int N;
@@ -232,7 +232,7 @@ void Wavelets::forward(void) {
         circshift(current_shift_r, current_shift_c, 1);
     }
     if (winfos.ndims == 1) {
-        if ((hlen == 2) && (!winfos.do_swt)) haar_forward1d(d_image, d_coeffs, d_tmp, winfos);
+        if ((winfos.hlen == 2) && (!winfos.do_swt)) haar_forward1d(d_image, d_coeffs, d_tmp, winfos);
         else {
             if (!winfos.do_swt) w_forward_separable_1d(d_image, d_coeffs, d_tmp, winfos);
             else w_forward_swt_separable_1d(d_image, d_coeffs, d_tmp, winfos);
@@ -497,13 +497,13 @@ int Wavelets::set_filters_forward(int len, float* filter1, float* filter2, float
         cudaMemcpyToSymbol(c_kern_HL, filter3, len*len*sizeof(float), 0, cudaMemcpyHostToDevice);
         cudaMemcpyToSymbol(c_kern_HH, filter4, len*len*sizeof(float), 0, cudaMemcpyHostToDevice);
     }
-    hlen = len;
+    winfos.hlen = len;
     return 0;
 }
 
 /// Here the filters are assumed to be of the same size of those provided to set_filters_forward()
 int Wavelets::set_filters_inverse(float* filter1, float* filter2, float* filter3, float* filter4) {
-    int len = hlen;
+    int len = winfos.hlen;
     if (do_separable) {
         // ignoring args 4 and 5
         cudaMemcpyToSymbol(c_kern_IL, filter1, len*sizeof(float), 0, cudaMemcpyHostToDevice);
