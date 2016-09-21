@@ -64,7 +64,7 @@ You can then run an example with
 
 ```bash
 make demo
-./bin/demo
+./build/demo
 ```
 
 and tune the wavelet, number of levels, etc. in the prompt.
