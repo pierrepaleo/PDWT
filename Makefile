@@ -6,14 +6,17 @@ PDWTCORE=src/wt.cu src/common.cu src/utils.cu src/separable.cu src/nonseparable.
 
 
 demo:
+	mkdir -p build
 	$(NVCC) -g $(CFLAGS) -o build/demo $(PDWTCORE) src/demo.cpp src/io.cpp -lcublas
 
 
 libpdwt.so:
+	mkdir -p build
 	$(NVCC) --ptxas-options=-v --compiler-options '-fPIC' -o build/$@ --shared $(PDWTCORE) $(CFLAGS) $(LDFLAGS)
 
 # Double precision library
 libpdwtd.so:
+	mkdir -p build
 	$(NVCC) --ptxas-options=-v --compiler-options '-fPIC' -o build/$@ --shared -DDOUBLEPRECISION $(PDWTCORE) $(CFLAGS) $(LDFLAGS)
 
 
@@ -21,4 +24,4 @@ libpdwtd.so:
 	$(NVCC) -c $(CFLAGS) $<
 
 clean:
-	rm -f demo *.o *.so
+	rm -f demo build
