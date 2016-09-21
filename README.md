@@ -1,6 +1,6 @@
 ## Parallel DWT
 
-PDWT is (yet another) parallel implementation of the Discrete Wavelet Transform (DWT).
+PDWT is a parallel implementation of the Discrete Wavelet Transform (DWT).
 This implementation in CUDA targets Nvidia GPUs.
 
 PDWT primarily aims at being fast, simple and versatile for an easy integration in a bigger project.
@@ -64,7 +64,7 @@ You can then run an example with
 
 ```bash
 make demo
-./demo
+./bin/demo
 ```
 
 and tune the wavelet, number of levels, etc. in the prompt.
