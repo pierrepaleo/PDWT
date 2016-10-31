@@ -9,6 +9,15 @@
 #include <cublas.h>
 
 
+/// When the size is odd, allocate one extra element before subsampling
+void w_div2(int* N) {
+    if ((*N) & 1) *N = ((*N)+1)/2;
+    else *N = (*N)/2;
+}
+
+
+
+
 /// soft thresholding of the detail coefficients (2D)
 /// Must be lanched with block size (Nc, Nr) : the size of the current coefficient vector
 __global__ void w_kern_soft_thresh(DTYPE* c_h, DTYPE* c_v, DTYPE* c_d, DTYPE beta, int Nr, int Nc) {
@@ -144,8 +153,8 @@ void w_call_soft_thresh(DTYPE** d_coeffs, DTYPE beta, w_info winfos, int do_thre
             puts("Warning: for now, threshold_cousins is only implemented for SWT");
             threshold_cousins = 0;
         }
-        if (ndims > 1) Nr2 /= 2;
-        Nc2 /= 2;
+        if (ndims > 1) w_div2(&Nr2);
+        w_div2(&Nc2);
     }
     if (do_thresh_appcoeffs || (threshold_cousins && ndims > 1)) {
         DTYPE beta2 = beta;
@@ -159,8 +168,8 @@ void w_call_soft_thresh(DTYPE** d_coeffs, DTYPE beta, w_info winfos, int do_thre
     }
     for (int i = 0; i < nlevels; i++) {
         if (!do_swt) {
-            if (ndims > 1) Nr /= 2;
-            Nc /= 2;
+            if (ndims > 1) w_div2(&Nr);
+            w_div2(&Nc);
         }
         if (normalize > 0) beta /= SQRT_2;
         n_blocks = dim3(w_iDivUp(Nc, tpb), w_iDivUp(Nr, tpb), 1);
@@ -181,8 +190,8 @@ void w_call_hard_thresh(DTYPE** d_coeffs, DTYPE beta, w_info winfos, int do_thre
     int Nr = winfos.Nr, Nc = winfos.Nc, do_swt = winfos.do_swt, nlevels = winfos.nlevels, ndims = winfos.ndims;
     int Nr2 = Nr, Nc2 = Nc;
     if (!do_swt) {
-        if (ndims > 1) Nr2 /= 2;
-        Nc2 /= 2;
+        if (ndims > 1) w_div2(&Nr2);
+        w_div2(&Nc2);
     }
     DTYPE beta2 = beta;
     if (do_thresh_appcoeffs) {
@@ -196,8 +205,8 @@ void w_call_hard_thresh(DTYPE** d_coeffs, DTYPE beta, w_info winfos, int do_thre
     }
     for (int i = 0; i < nlevels; i++) {
         if (!do_swt) {
-            if (ndims > 1) Nr /= 2;
-            Nc /= 2;
+            if (ndims > 1) w_div2(&Nr);
+            w_div2(&Nc);
         }
         if (normalize > 0) beta /= SQRT_2;
         n_blocks = dim3(w_iDivUp(Nc, tpb), w_iDivUp(Nr, tpb), 1);
@@ -211,16 +220,16 @@ void w_shrink(DTYPE** d_coeffs, DTYPE beta, w_info winfos, int do_thresh_appcoef
     int Nr = winfos.Nr, Nc = winfos.Nc, do_swt = winfos.do_swt, nlevels = winfos.nlevels, ndims = winfos.ndims;
     int Nr2 = Nr, Nc2 = Nc;
     if (!do_swt) {
-        if (ndims > 1) Nr2 /= 2;
-        Nc2 /= 2;
+        if (ndims > 1) w_div2(&Nr2);
+        w_div2(&Nc2);
     }
     if (do_thresh_appcoeffs) {
         cublas_scal(Nr2*Nc2, 1.0f/(1.0f + beta), d_coeffs[0], 1);
     }
     for (int i = 0; i < nlevels; i++) {
         if (!do_swt) {
-            if (ndims > 1) Nr /= 2;
-            Nc /= 2;
+            if (ndims > 1) w_div2(&Nr);
+            w_div2(&Nc);
         }
         if (ndims == 2) {
             cublas_scal(Nr*Nc, 1.0f/(1.0f + beta), d_coeffs[3*i+1], 1);
@@ -263,13 +272,16 @@ void w_call_circshift(DTYPE* d_image, DTYPE* d_image2, w_info winfos, int sr, in
 DTYPE** w_create_coeffs_buffer(w_info winfos) {
     int Nr = winfos.Nr, Nc = winfos.Nc, do_swt = winfos.do_swt, nlevels = winfos.nlevels;
     int Nr0 = Nr, Nc0 = Nc;
-    if (!do_swt) { Nr0 /= 2; Nc0 /= 2; }
+    if (!do_swt) {
+        w_div2(&Nr0);
+        w_div2(&Nc0);
+    }
     DTYPE** res = (DTYPE**) calloc(3*nlevels+1, sizeof(DTYPE*));
     // Coeffs (H, V, D)
     for (int i = 1; i < 3*nlevels+1; i += 3) {
         if (!do_swt) {
-            Nr /= 2;
-            Nc /= 2;
+            w_div2(&Nr);
+            w_div2(&Nc);
         }
         cudaMalloc(&(res[i]), Nr*Nc*sizeof(DTYPE));
         cudaMemset(res[i], 0, Nr*Nc*sizeof(DTYPE));
@@ -290,11 +302,11 @@ DTYPE** w_create_coeffs_buffer(w_info winfos) {
 DTYPE** w_create_coeffs_buffer_1d(w_info winfos) {
     int Nr = winfos.Nr, Nc = winfos.Nc, do_swt = winfos.do_swt, nlevels = winfos.nlevels;
     int Nc0 = Nc;
-    if (!do_swt) Nc0 /= 2;
+    if (!do_swt) w_div2(&Nc0);
     DTYPE** res = (DTYPE**) calloc(nlevels+1, sizeof(DTYPE*));
     // Det coeffs
     for (int i = 1; i < nlevels+1; i++) {
-        if (!do_swt) Nc /= 2;
+        if (!do_swt) w_div2(&Nc);
         cudaMalloc(&(res[i]), Nr*Nc*sizeof(DTYPE));
         cudaMemset(res[i], 0, Nr*Nc*sizeof(DTYPE));
     }
@@ -324,8 +336,8 @@ void w_copy_coeffs_buffer(DTYPE** dst, DTYPE** src, w_info winfos) {
     // Coeffs (H, V, D)
     for (int i = 1; i < 3*nlevels+1; i += 3) {
         if (!do_swt) {
-            Nr /= 2;
-            Nc /= 2;
+            w_div2(&Nr);
+            w_div2(&Nc);
         }
         cudaMemcpy(dst[i], src[i], Nr*Nc*sizeof(DTYPE), cudaMemcpyDeviceToDevice);
         cudaMemcpy(dst[i+1], src[i+1], Nr*Nc*sizeof(DTYPE), cudaMemcpyDeviceToDevice);
@@ -340,7 +352,7 @@ void w_copy_coeffs_buffer_1d(DTYPE** dst, DTYPE** src, w_info winfos) {
     int Nr = winfos.Nr, Nc = winfos.Nc, nlevels = winfos.nlevels, do_swt = winfos.do_swt;
     // Det Coeffs
     for (int i = 1; i < nlevels+1; i++) {
-        if (!do_swt) Nc /= 2;
+        if (!do_swt) w_div2(&Nc);
         cudaMemcpy(dst[i], src[i], Nr*Nc*sizeof(DTYPE), cudaMemcpyDeviceToDevice);
     }
     // App coeff (last scale)
@@ -361,8 +373,8 @@ void w_add_coeffs(DTYPE** dst, DTYPE** src, w_info winfos, DTYPE alpha) {
     // Coeffs (H, V, D)
     for (int i = 1; i < 3*nlevels+1; i += 3) {
         if (!do_swt) {
-            Nr /= 2;
-            Nc /= 2;
+            w_div2(&Nr);
+            w_div2(&Nc);
         }
         cublas_axpy(Nr*Nc, alpha, src[i], 1, dst[i], 1);
         cublas_axpy(Nr*Nc, alpha, src[i+1], 1, dst[i+1], 1);

@@ -162,6 +162,7 @@ Wavelets::Wavelets(
     if (ndim == 2) N = min(Nr, Nc);
     else N = Nc;
     int wmaxlev = w_ilog2(N/hlen);
+    // TODO: remove this limitation
     if (levels > wmaxlev) {
         printf("Warning: required level (%d) is greater than the maximum possible level for %s (%d) on a %dx%d image.\n", winfos.nlevels, wname, wmaxlev, winfos.Nc, winfos.Nr);
         printf("Forcing nlevels = %d\n", wmaxlev);
@@ -324,21 +325,27 @@ void Wavelets::circshift(int sr, int sc, int inplace) {
 /// Method : squared L2 norm
 DTYPE Wavelets::norm2sq(void) {
     DTYPE res = 0.0f;
-    int Nr2, Nc2;
-    if (!winfos.do_swt) { Nr2 = winfos.Nr/2; Nc2 = winfos.Nc/2; }
-    else { Nr2 = winfos.Nr; Nc2 = winfos.Nc; }
+    int Nr2 = winfos.Nr;
+    int Nc2 = winfos.Nc;
     DTYPE tmp = 0;
     for (int i = 0; i < winfos.nlevels; i++) {
-        tmp = cublas_nrm2(Nr2*Nc2, d_coeffs[3*i+1], 1);
-        res += tmp*tmp;
-        tmp =cublas_nrm2(Nr2*Nc2, d_coeffs[3*i+2], 1);
-        res += tmp*tmp;
-        tmp = cublas_nrm2(Nr2*Nc2, d_coeffs[3*i+3], 1);
-        res += tmp*tmp;
-        if (!winfos.do_swt) { Nr2 /= 2; Nc2 /= 2; }
+        if (!winfos.do_swt) {
+            if (winfos.ndims > 1) w_div2(&Nr2);
+            w_div2(&Nc2);
+        }
+        if (winfos.ndims == 2) { // 2D
+            tmp = cublas_nrm2(Nr2*Nc2, d_coeffs[3*i+1], 1);
+            res += tmp*tmp;
+            tmp =cublas_nrm2(Nr2*Nc2, d_coeffs[3*i+2], 1);
+            res += tmp*tmp;
+            tmp = cublas_nrm2(Nr2*Nc2, d_coeffs[3*i+3], 1);
+            res += tmp*tmp;
+        }
+        else { // 1D
+            res += cublas_asum(Nr2*Nc2, d_coeffs[i+1], 1);
+        }
     }
-    int nels = ((winfos.do_swt) ? (Nr2*Nc2) : (Nr2*Nc2*4));
-    tmp = cublas_nrm2(nels, d_coeffs[0], 1);
+    tmp = cublas_nrm2(Nr2*Nc2, d_coeffs[0], 1);
     res += tmp*tmp;
     return res;
 }
@@ -346,9 +353,13 @@ DTYPE Wavelets::norm2sq(void) {
 /// Method : L1 norm
 DTYPE Wavelets::norm1(void) {
     DTYPE res = 0.0f;
-    int Nr2 = winfos.Nr, Nc2 = winfos.Nc;
-    if (!winfos.do_swt) { if (winfos.ndims > 1) Nr2 = winfos.Nr/2; Nc2 = winfos.Nc/2; }
+    int Nr2 = winfos.Nr;
+    int Nc2 = winfos.Nc;
     for (int i = 0; i < winfos.nlevels; i++) {
+        if (!winfos.do_swt) {
+            if (winfos.ndims > 1) w_div2(&Nr2);
+            w_div2(&Nc2);
+        }
         if (winfos.ndims == 2) { // 2D
             res += cublas_asum(Nr2*Nc2, d_coeffs[3*i+1], 1);
             res += cublas_asum(Nr2*Nc2, d_coeffs[3*i+2], 1);
@@ -357,12 +368,8 @@ DTYPE Wavelets::norm1(void) {
         else { // 1D
             res += cublas_asum(Nr2*Nc2, d_coeffs[i+1], 1);
         }
-        if (!winfos.do_swt) { if (winfos.ndims > 1) Nr2 /= 2; Nc2 /= 2; }
     }
-    int nels;
-    if (winfos.ndims == 2) nels = ((winfos.do_swt) ? (Nr2*Nc2) : (Nr2*Nc2*4));
-    else nels = ((winfos.do_swt) ? (Nr2*Nc2) : (Nr2*Nc2*2));
-    res += cublas_asum(nels, d_coeffs[0], 1);
+    res += cublas_asum(Nr2*Nc2, d_coeffs[0], 1);
     return res;
 }
 
@@ -388,15 +395,28 @@ void Wavelets::set_coeff(DTYPE* coeff, int num, int mem_is_on_device) { // There
     if (mem_is_on_device) copykind = cudaMemcpyDeviceToDevice;
     else copykind = cudaMemcpyHostToDevice;
     int Nr2 = winfos.Nr, Nc2 = winfos.Nc;
-    if (!winfos.do_swt) {
-        if (winfos.ndims == 2) {
-            int factor = ((num == 0) ? (w_ipow2(winfos.nlevels)) : (w_ipow2((num-1)/3 +1)));
-            Nr2 /= factor;
-            Nc2 /= factor;
+    if (winfos.ndims == 2) {
+        // In 2D, num stands for the following:
+        // A  H1 V1 D1  H2 V2 D2
+        // 0  1  2  3   4  5  6
+        // for num>0,  1+(num-1)/3 tells the scale number
+        int scale;
+        if (num == 0) scale = winfos.nlevels;
+        else scale = ((num-1)/3) +1;
+        for (int i = 0; i < scale; i++) {
+            w_div2(&Nr2);
+            w_div2(&Nc2);
         }
-        else { // (ndim == 1)
-            int factor = ((num == 0) ? (w_ipow2(winfos.nlevels)) : (w_ipow2((num-1) +1)));
-            Nc2 /= factor;
+    }
+    else if (ndim == 1) {
+        // In 1D, num stands for the following:
+        // A  D1 D2 D3
+        // 0  1  2  3
+        int scale;
+        if (num == 0) scale = winfos.nlevels;
+        else scale = num;
+        for (int i = 0; i < scale; i++) {
+            w_div2(&Nc2);
         }
     }
     cudaMemcpy(d_coeffs[num], coeff, Nr2*Nc2*sizeof(DTYPE), copykind);
@@ -411,22 +431,35 @@ void Wavelets::set_coeff(DTYPE* coeff, int num, int mem_is_on_device) { // There
 int Wavelets::get_coeff(DTYPE* coeff, int num) {
     if (state == W_INVERSE) {
         puts("Warning: get_coeff(): inverse() has been performed, the coefficients has been modified and do not make sense anymore.");
-        // TODO : then what ?
+        return 0;
     }
     int Nr2 = winfos.Nr, Nc2 = winfos.Nc;
-    if (!winfos.do_swt) {
-        if (winfos.ndims == 2) {
-            int factor = ((num == 0) ? (w_ipow2(winfos.nlevels)) : (w_ipow2((num-1)/3 +1)));
-            Nr2 /= factor;
-            Nc2 /= factor;
+    if (winfos.ndims == 2) {
+        // In 2D, num stands for the following:
+        // A  H1 V1 D1  H2 V2 D2
+        // 0  1  2  3   4  5  6
+        // for num>0,  1+(num-1)/3 tells the scale number
+        int scale;
+        if (num == 0) scale = winfos.nlevels;
+        else scale = ((num-1)/3) +1;
+        for (int i = 0; i < scale; i++) {
+            w_div2(&Nr2);
+            w_div2(&Nc2);
         }
-        else { // (ndim == 1)
-            int factor = ((num == 0) ? (w_ipow2(winfos.nlevels)) : (w_ipow2((num-1) +1)));
-            Nc2 /= factor;
+    }
+    else if (ndim == 1) {
+        // In 1D, num stands for the following:
+        // A  D1 D2 D3
+        // 0  1  2  3
+        int scale;
+        if (num == 0) scale = winfos.nlevels;
+        else scale = num;
+        for (int i = 0; i < scale; i++) {
+            w_div2(&Nc2);
         }
     }
     //~ printf("Retrieving %d (%d x %d)\n", num, Nr2, Nc2);
-    cudaMemcpy(coeff, d_coeffs[num], Nr2*Nc2*sizeof(DTYPE), cudaMemcpyDeviceToHost);
+    cudaMemcpy(coeff, d_coeffs[num], Nr2*Nc2*sizeof(DTYPE), cudaMemcpyDeviceToHost); //TODO: handle DeviceToDevice ?
     return Nr2*Nc2;
 }
 
