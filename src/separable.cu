@@ -321,29 +321,28 @@ int w_inverse_separable(DTYPE* d_image, DTYPE** d_coeffs, DTYPE* d_tmp, w_info w
     return 0;
 }
 
-
 // (batched) 1D inverse transform. Boils down to 2D separable transform without the first pass.
+// TODO: consider deleting these memcpy. Simply do inverse_pass2: coeffs[i] => coeffs[i+1]. coeffs are overwritten anyway.
 int w_inverse_separable_1d(DTYPE* d_image, DTYPE** d_coeffs, DTYPE* d_tmp, w_info winfos) {
     int Nr = winfos.Nr, Nc = winfos.Nc, levels = winfos.nlevels, hlen = winfos.hlen;
-    DTYPE* d_tmp1 = d_coeffs[0];
-    DTYPE* d_tmp2 = d_tmp;
-    Nc /= w_ipow2(levels);
+    // Table of sizes. FIXME: consider adding this in the w_info structure
+    int tNc[levels+1];
+    for (int i = 1; i <= levels; i++) {
+        tNc[i] = tNc[i-1];
+        w_div2(tNc + i);
+    }
 
     int tpb = 16; // TODO : tune for max perfs.
-    int Nc2 = Nc*2;
     dim3 n_blocks;
     dim3 n_threads_per_block = dim3(tpb, tpb, 1);
 
     for (int i = levels-1; i >= 1; i--) {
-        n_blocks = dim3(w_iDivUp(Nc2, tpb), w_iDivUp(Nr, tpb), 1);
-        w_kern_inverse_pass2<<<n_blocks, n_threads_per_block>>>(d_tmp1, d_coeffs[i+1], d_tmp2, Nr, Nc2/2, hlen);
-        Nc2 *= 2;
-        w_swap_ptr(&d_tmp1, &d_tmp2);
+        n_blocks = dim3(w_iDivUp(tNc[i], tpb), w_iDivUp(Nr, tpb), 1);
+        w_kern_inverse_pass2<<<n_blocks, n_threads_per_block>>>(coeffs[i], d_coeffs[i+1], d_tmp2, Nr, tNc[i+1], hlen);
     }
-    if ((levels & 1) == 0) cudaMemcpy(d_coeffs[0], d_tmp, Nr*Nc2/2*sizeof(DTYPE), cudaMemcpyDeviceToDevice);
     // First scale
-    n_blocks = dim3(w_iDivUp(Nc2, tpb), w_iDivUp(Nr, tpb), 1);
-    w_kern_inverse_pass2<<<n_blocks, n_threads_per_block>>>(d_coeffs[0], d_coeffs[1], d_image, Nr, Nc2/2, hlen);
+    n_blocks = dim3(w_iDivUp(Nc, tpb), w_iDivUp(Nr, tpb), 1);
+    w_kern_inverse_pass2<<<n_blocks, n_threads_per_block>>>(d_coeffs[0], d_coeffs[1], d_image, Nr, tNc[1], hlen);
 
     return 0;
 }
