@@ -134,27 +134,32 @@ __global__ void w_kern_forward_pass2(DTYPE* tmp_a1, DTYPE* tmp_a2, DTYPE* c_a, D
 
 int w_forward_separable(DTYPE* d_image, DTYPE** d_coeffs, DTYPE* d_tmp, w_info winfos) {
     int Nr = winfos.Nr, Nc = winfos.Nc, levels = winfos.nlevels, hlen = winfos.hlen;
+    int Nc2 = Nc, Nr2 = Nr;
+    int Nc2_old = Nc2, Nr2_old = Nr;
+    w_div2(&Nc2);
+    w_div2(&Nr2);
+    // d_tmp can have up to 2*Nr*Nc elemets (two input images) [Nr*Nc would be enough here].
+    // Here d_tmp1 (resp. d_tmp2) is used for the horizontal (resp. vertical) downsampling.
+    // Given a dimension size N, the subsampled dimension size is N/2 if N is even, (N+1)/2 otherwise.
     DTYPE* d_tmp1 = d_tmp;
-    DTYPE* d_tmp2 = d_tmp + Nr*Nc/2;
+    DTYPE* d_tmp2 = d_tmp + Nr*Nc2;
 
     // First level
     int tpb = 16; // TODO : tune for max perfs.
-    int Nc2 = Nc/2, Nr2 = Nr/2;
-
     dim3 n_blocks_1 = dim3(w_iDivUp(Nc2, tpb), w_iDivUp(Nr, tpb), 1);
     dim3 n_blocks_2 = dim3(w_iDivUp(Nc2, tpb), w_iDivUp(Nr2, tpb), 1);
     dim3 n_threads_per_block = dim3(tpb, tpb, 1);
-
-    w_kern_forward_pass1<<<n_blocks_1, n_threads_per_block>>>(d_image, d_tmp1, d_tmp2, Nr2*2, Nc2*2, hlen);
-    w_kern_forward_pass2<<<n_blocks_2, n_threads_per_block>>>(d_tmp1, d_tmp2, d_coeffs[0], d_coeffs[1], d_coeffs[2], d_coeffs[3], Nr2*2, Nc2, hlen);
+    w_kern_forward_pass1<<<n_blocks_1, n_threads_per_block>>>(d_image, d_tmp1, d_tmp2, Nr2_old, Nc2_old, hlen);
+    w_kern_forward_pass2<<<n_blocks_2, n_threads_per_block>>>(d_tmp1, d_tmp2, d_coeffs[0], d_coeffs[1], d_coeffs[2], d_coeffs[3], Nr2_old, Nc2, hlen);
 
     for (int i=1; i < levels; i++) {
-        Nc2 /= 2;
-        Nr2 /= 2;
-        n_blocks_1 = dim3(w_iDivUp(Nc2, tpb), w_iDivUp(Nr2*2, tpb), 1);
+        Nc2_old = Nc2; Nr2_old = Nr;
+        w_div2(&Nc2);
+        w_div2(&Nr2);
+        n_blocks_1 = dim3(w_iDivUp(Nc2, tpb), w_iDivUp(Nr2_old, tpb), 1);
         n_blocks_2 = dim3(w_iDivUp(Nc2, tpb), w_iDivUp(Nr2, tpb), 1);
-        w_kern_forward_pass1<<<n_blocks_1, n_threads_per_block>>>(d_coeffs[0], d_tmp1, d_tmp2, Nr2*2, Nc2*2, hlen);
-        w_kern_forward_pass2<<<n_blocks_2, n_threads_per_block>>>(d_tmp1, d_tmp2, d_coeffs[0], d_coeffs[3*i+1], d_coeffs[3*i+2], d_coeffs[3*i+3], Nr2*2, Nc2, hlen);
+        w_kern_forward_pass1<<<n_blocks_1, n_threads_per_block>>>(d_coeffs[0], d_tmp1, d_tmp2, Nr2_old, Nc2_old, hlen);
+        w_kern_forward_pass2<<<n_blocks_2, n_threads_per_block>>>(d_tmp1, d_tmp2, d_coeffs[0], d_coeffs[3*i+1], d_coeffs[3*i+2], d_coeffs[3*i+3], Nr2_old, Nc2, hlen);
     }
     return 0;
 }
@@ -168,15 +173,18 @@ int w_forward_separable_1d(DTYPE* d_image, DTYPE** d_coeffs, DTYPE* d_tmp, w_inf
     DTYPE* d_tmp2 = d_tmp;
     // First level
     int tpb = 16; // TODO : tune for max perfs.
-    int Nc2 = Nc/2;
+    int Nc2 = Nc;
+    int Nc2_old = Nc2;
+    w_div2(&Nc2);
     // TODO: which block strategy for the "y" dimension ?
     dim3 n_blocks = dim3(w_iDivUp(Nc2, tpb), w_iDivUp(Nr, tpb), 1);
     dim3 n_threads_per_block = dim3(tpb, tpb, 1);
-    w_kern_forward_pass1<<<n_blocks, n_threads_per_block>>>(d_image, d_coeffs[0], d_coeffs[1], Nr, Nc2*2, hlen);
+    w_kern_forward_pass1<<<n_blocks, n_threads_per_block>>>(d_image, d_coeffs[0], d_coeffs[1], Nr, Nc2_old, hlen);
     for (int i=1; i < levels; i++) {
-        Nc2 /= 2;
+        Nc2_old = Nc2;
+        w_div2(&Nc2);
         n_blocks = dim3(w_iDivUp(Nc2, tpb), w_iDivUp(Nr, tpb), 1);
-        w_kern_forward_pass1<<<n_blocks, n_threads_per_block>>>(d_tmp1, d_tmp2, d_coeffs[i+1], Nr, Nc2*2, hlen);
+        w_kern_forward_pass1<<<n_blocks, n_threads_per_block>>>(d_tmp1, d_tmp2, d_coeffs[i+1], Nr, Nc2_old, hlen);
         w_swap_ptr(&d_tmp1, &d_tmp2);
     }
     if ((levels & 1) == 0) cudaMemcpy(d_coeffs[0], d_tmp, Nr*Nc2*sizeof(DTYPE), cudaMemcpyDeviceToDevice);
@@ -280,30 +288,35 @@ __global__ void w_kern_inverse_pass2(DTYPE* tmp1, DTYPE* tmp2, DTYPE* img, int N
 
 int w_inverse_separable(DTYPE* d_image, DTYPE** d_coeffs, DTYPE* d_tmp, w_info winfos) {
     int Nr = winfos.Nr, Nc = winfos.Nc, levels = winfos.nlevels, hlen = winfos.hlen;
+    int Nr2 = Nr, Nc2 = Nc;
+    // Table of sizes. FIXME: consider adding this in the w_info structure
+    int tNr[levels+1]; tNr[0] = Nr;
+    int tNc[levels+1]; tNc[0] = Nc;
+    for (int i = 1; i <= levels; i++) {
+        tNr[i] = tNr[i-1];
+        tNc[i] = tNc[i-1];
+        w_div2(tNr + i);
+        w_div2(tNc + i);
+    }
     DTYPE* d_tmp1 = d_tmp;
-    DTYPE* d_tmp2 = d_tmp + Nr*Nc/2;
-
-    Nr /= w_ipow2(levels);
-    Nc /= w_ipow2(levels);
+    DTYPE* d_tmp2 = d_tmp + Nr*tNc[1];
 
     int tpb = 16; // TODO : tune for max perfs.
-    int Nc2 = Nc*2, Nr2 = Nr*2;
     dim3 n_blocks_1, n_blocks_2;
     dim3 n_threads_per_block = dim3(tpb, tpb, 1);
 
+    // TODO: variables for better readability instead of tNr[i], tNc[i]
     for (int i = levels-1; i >= 1; i--) {
-        n_blocks_1 = dim3(w_iDivUp(Nc2/2, tpb), w_iDivUp(Nr2, tpb), 1);
-        n_blocks_2 = dim3(w_iDivUp(Nc2, tpb), w_iDivUp(Nr2, tpb), 1);
-        w_kern_inverse_pass1<<<n_blocks_1, n_threads_per_block>>>(d_coeffs[0], d_coeffs[3*i+1], d_coeffs[3*i+2], d_coeffs[3*i+3], d_tmp1, d_tmp2, Nr2/2, Nc2/2, hlen);
-        w_kern_inverse_pass2<<<n_blocks_2, n_threads_per_block>>>(d_tmp1, d_tmp2, d_coeffs[0], Nr2, Nc2/2, hlen);
-        Nr2 *= 2;
-        Nc2 *= 2;
+        n_blocks_1 = dim3(w_iDivUp(tNc[i+1], tpb), w_iDivUp(tNr[i], tpb), 1);
+        n_blocks_2 = dim3(w_iDivUp(tNc[i], tpb), w_iDivUp(tNr[i], tpb), 1);
+        w_kern_inverse_pass1<<<n_blocks_1, n_threads_per_block>>>(d_coeffs[0], d_coeffs[3*i+1], d_coeffs[3*i+2], d_coeffs[3*i+3], d_tmp1, d_tmp2, tNr[i+1], tNc[i+1], hlen);
+        w_kern_inverse_pass2<<<n_blocks_2, n_threads_per_block>>>(d_tmp1, d_tmp2, d_coeffs[0], tNr[i], tNc[i+1], hlen);
     }
     // First scale
-    n_blocks_1 = dim3(w_iDivUp(Nc2/2, tpb), w_iDivUp(Nr2, tpb), 1);
+    n_blocks_1 = dim3(w_iDivUp(tNc[1], tpb), w_iDivUp(tNr[0], tpb), 1);
     n_blocks_2 = dim3(w_iDivUp(Nc2, tpb), w_iDivUp(Nr2, tpb), 1);
-    w_kern_inverse_pass1<<<n_blocks_1, n_threads_per_block>>>(d_coeffs[0], d_coeffs[1], d_coeffs[2], d_coeffs[3], d_tmp1, d_tmp2, Nr2/2, Nc2/2, hlen);
-    w_kern_inverse_pass2<<<n_blocks_2, n_threads_per_block>>>(d_tmp1, d_tmp2, d_image, Nr2, Nc2/2, hlen);
+    w_kern_inverse_pass1<<<n_blocks_1, n_threads_per_block>>>(d_coeffs[0], d_coeffs[1], d_coeffs[2], d_coeffs[3], d_tmp1, d_tmp2, tNr[1], tNc[1], hlen);
+    w_kern_inverse_pass2<<<n_blocks_2, n_threads_per_block>>>(d_tmp1, d_tmp2, d_image, tNr[0], tNc[1], hlen);
 
     return 0;
 }
