@@ -20,6 +20,13 @@ int w_ilog2(int i) {
 }
 
 
+/// When the size is odd, allocate one extra element before subsampling
+void w_div2(int* N) {
+    if ((*N) & 1) *N = ((*N)+1)/2;
+    else *N = (*N)/2;
+}
+
+
 void w_swap_ptr(DTYPE** a, DTYPE** b) {
     DTYPE* tmp = *a;
     *a = *b;

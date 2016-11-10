@@ -24,7 +24,8 @@ int w_ipow2(int a);
 
 int w_ilog2(int i);
 
-void w_swap_ptr(DTYPE** a, DTYPE** b);
+void w_div2(int* N);
 
+void w_swap_ptr(DTYPE** a, DTYPE** b);
 
 #endif

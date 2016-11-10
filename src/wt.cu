@@ -408,7 +408,7 @@ void Wavelets::set_coeff(DTYPE* coeff, int num, int mem_is_on_device) { // There
             w_div2(&Nc2);
         }
     }
-    else if (ndim == 1) {
+    else if (winfos.ndims == 1) {
         // In 1D, num stands for the following:
         // A  D1 D2 D3
         // 0  1  2  3
@@ -447,7 +447,7 @@ int Wavelets::get_coeff(DTYPE* coeff, int num) {
             w_div2(&Nc2);
         }
     }
-    else if (ndim == 1) {
+    else if (winfos.ndims == 1) {
         // In 1D, num stands for the following:
         // A  D1 D2 D3
         // 0  1  2  3

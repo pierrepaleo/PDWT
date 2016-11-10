@@ -74,12 +74,15 @@ __global__ void w_kern_forward_pass1(DTYPE* img, DTYPE* tmp_a1, DTYPE* tmp_a2, i
         int jx2 = Nc - 1 - 2*gidx + c;
         DTYPE res_tmp_a1 = 0, res_tmp_a2 = 0;
         DTYPE img_val;
+        int Nc_is_odd = (Nc & 1);
 
         // Convolution with periodic boundaries extension.
         for (int jx = 0; jx <= hR+hL; jx++) {
             int idx_x = gidx*2 - c + jx;
             if (jx < jx1) idx_x += Nc;
-            if (jx > jx2) idx_x -= Nc ;
+            else if (Nc_is_odd && jx == jx2+1) idx_x--; // if N is odd, repeat the right-most element
+            else if (jx > jx2) idx_x -= Nc;
+            else ;
 
             img_val = img[(gidy*1)*Nc + idx_x]; // <=
             res_tmp_a1 += img_val * c_kern_L[hlen-1 - jx];
@@ -111,12 +114,15 @@ __global__ void w_kern_forward_pass2(DTYPE* tmp_a1, DTYPE* tmp_a2, DTYPE* c_a, D
         int jy1 = c - gidy*2;
         int jy2 = Nr - 1 - gidy*2 + c;
         DTYPE res_a = 0, res_h = 0, res_v = 0, res_d = 0;
+        int Nr_is_odd = (Nr & 1);
 
         // Convolution with periodic boundaries extension.
         for (int jy = 0; jy <= hR+hL; jy++) {
             int idx_y = gidy*2 - c + jy;
             if (jy < jy1) idx_y += Nr;
-            if (jy > jy2) idx_y -= Nr ;
+            else if (Nr_is_odd && jy == jy2+1) idx_y--; // if N is odd, repeat the right-most element
+            else if (jy > jy2) idx_y -= Nr;
+            else ;
 
             res_a += tmp_a1[idx_y*Nc + gidx] * c_kern_L[hlen-1 - jy];
             res_h += tmp_a1[idx_y*Nc + gidx] * c_kern_H[hlen-1 - jy];
@@ -338,7 +344,7 @@ int w_inverse_separable_1d(DTYPE* d_image, DTYPE** d_coeffs, DTYPE* d_tmp, w_inf
 
     for (int i = levels-1; i >= 1; i--) {
         n_blocks = dim3(w_iDivUp(tNc[i], tpb), w_iDivUp(Nr, tpb), 1);
-        w_kern_inverse_pass2<<<n_blocks, n_threads_per_block>>>(coeffs[i], d_coeffs[i+1], d_tmp2, Nr, tNc[i+1], hlen);
+        w_kern_inverse_pass2<<<n_blocks, n_threads_per_block>>>(d_coeffs[i], d_coeffs[i+1], d_tmp, Nr, tNc[i+1], hlen);
     }
     // First scale
     n_blocks = dim3(w_iDivUp(Nc, tpb), w_iDivUp(Nr, tpb), 1);

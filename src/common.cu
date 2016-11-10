@@ -9,14 +9,6 @@
 #include <cublas.h>
 
 
-/// When the size is odd, allocate one extra element before subsampling
-void w_div2(int* N) {
-    if ((*N) & 1) *N = ((*N)+1)/2;
-    else *N = (*N)/2;
-}
-
-
-
 
 /// soft thresholding of the detail coefficients (2D)
 /// Must be lanched with block size (Nc, Nr) : the size of the current coefficient vector
