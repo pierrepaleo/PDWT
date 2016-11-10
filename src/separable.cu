@@ -160,7 +160,7 @@ int w_forward_separable(DTYPE* d_image, DTYPE** d_coeffs, DTYPE* d_tmp, w_info w
     w_kern_forward_pass2<<<n_blocks_2, n_threads_per_block>>>(d_tmp1, d_tmp2, d_coeffs[0], d_coeffs[1], d_coeffs[2], d_coeffs[3], Nr2_old, Nc2, hlen);
 
     for (int i=1; i < levels; i++) {
-        Nc2_old = Nc2; Nr2_old = Nr;
+        Nc2_old = Nc2; Nr2_old = Nr2;
         w_div2(&Nc2);
         w_div2(&Nr2);
         n_blocks_1 = dim3(w_iDivUp(Nc2, tpb), w_iDivUp(Nr2_old, tpb), 1);
