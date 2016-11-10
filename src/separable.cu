@@ -206,10 +206,9 @@ int w_forward_separable_1d(DTYPE* d_image, DTYPE** d_coeffs, DTYPE* d_tmp, w_inf
 
 // must be run with grid size = (Nc, 2*Nr) ; Nr = numrows of input coefficients
 // pass 1 : (a, h, v, d)  ==> Vertical convol with IL, IH  +  vertical oversampling==> (tmp1, tmp2)
-__global__ void w_kern_inverse_pass1(DTYPE* c_a, DTYPE* c_h, DTYPE* c_v, DTYPE* c_d, DTYPE* tmp1, DTYPE* tmp2, int Nr, int Nc, int hlen) {
+__global__ void w_kern_inverse_pass1(DTYPE* c_a, DTYPE* c_h, DTYPE* c_v, DTYPE* c_d, DTYPE* tmp1, DTYPE* tmp2, int Nr, int Nc, int Nr2, int hlen) {
     int gidx = threadIdx.x + blockIdx.x*blockDim.x;
     int gidy = threadIdx.y + blockIdx.y*blockDim.y;
-    int Nr2 = Nr*2;
     if (gidy < Nr2 && gidx < Nc) { // vertic oversampling : Input (Nr, Nc) => Output (Nr*2, Nc)
         int c, hL, hR;
         int hlen2 = hlen/2; // Convolutions with even/odd indices of the kernels
@@ -223,7 +222,7 @@ __global__ void w_kern_inverse_pass1(DTYPE* c_a, DTYPE* c_h, DTYPE* c_v, DTYPE* 
             hL = c;
             hR = c-1;
             // virtual id for shift
-            // TODO : for the very first convolution (on the edges), this is not exactly accurate (?)
+            // TODO : more elegant
             gidy += 1;
         }
         int jy1 = c - gidy/2;
@@ -254,10 +253,9 @@ __global__ void w_kern_inverse_pass1(DTYPE* c_a, DTYPE* c_h, DTYPE* c_v, DTYPE* 
 
 // must be run with grid size = (2*Nr, 2*Nc) ; Nc = numcols of input coeffs. Here the param Nr is actually doubled wrt Nr_coeffs because of the vertical oversampling.
 // pass 2 : (tmp1, tmp2)  ==> Horiz convol with IL, IH  + horiz oversampling ==> I
-__global__ void w_kern_inverse_pass2(DTYPE* tmp1, DTYPE* tmp2, DTYPE* img, int Nr, int Nc, int hlen) {
+__global__ void w_kern_inverse_pass2(DTYPE* tmp1, DTYPE* tmp2, DTYPE* img, int Nr, int Nc, int Nc2, int hlen) {
     int gidx = threadIdx.x + blockIdx.x*blockDim.x;
     int gidy = threadIdx.y + blockIdx.y*blockDim.y;
-    int Nc2 = Nc*2;
     if (gidy < Nr && gidx < Nc2) { // horiz oversampling : Input (Nr*2, Nc) => Output (Nr*2, Nc*2)
         int c, hL, hR;
         int hlen2 = hlen/2; // Convolutions with even/odd indices of the kernels
@@ -316,14 +314,14 @@ int w_inverse_separable(DTYPE* d_image, DTYPE** d_coeffs, DTYPE* d_tmp, w_info w
     for (int i = levels-1; i >= 1; i--) {
         n_blocks_1 = dim3(w_iDivUp(tNc[i+1], tpb), w_iDivUp(tNr[i], tpb), 1);
         n_blocks_2 = dim3(w_iDivUp(tNc[i], tpb), w_iDivUp(tNr[i], tpb), 1);
-        w_kern_inverse_pass1<<<n_blocks_1, n_threads_per_block>>>(d_coeffs[0], d_coeffs[3*i+1], d_coeffs[3*i+2], d_coeffs[3*i+3], d_tmp1, d_tmp2, tNr[i+1], tNc[i+1], hlen);
-        w_kern_inverse_pass2<<<n_blocks_2, n_threads_per_block>>>(d_tmp1, d_tmp2, d_coeffs[0], tNr[i], tNc[i+1], hlen);
+        w_kern_inverse_pass1<<<n_blocks_1, n_threads_per_block>>>(d_coeffs[0], d_coeffs[3*i+1], d_coeffs[3*i+2], d_coeffs[3*i+3], d_tmp1, d_tmp2, tNr[i+1], tNc[i+1], tNr[i], hlen);
+        w_kern_inverse_pass2<<<n_blocks_2, n_threads_per_block>>>(d_tmp1, d_tmp2, d_coeffs[0], tNr[i], tNc[i+1], tNc[i], hlen);
     }
     // First scale
     n_blocks_1 = dim3(w_iDivUp(tNc[1], tpb), w_iDivUp(tNr[0], tpb), 1);
     n_blocks_2 = dim3(w_iDivUp(Nc2, tpb), w_iDivUp(Nr2, tpb), 1);
-    w_kern_inverse_pass1<<<n_blocks_1, n_threads_per_block>>>(d_coeffs[0], d_coeffs[1], d_coeffs[2], d_coeffs[3], d_tmp1, d_tmp2, tNr[1], tNc[1], hlen);
-    w_kern_inverse_pass2<<<n_blocks_2, n_threads_per_block>>>(d_tmp1, d_tmp2, d_image, tNr[0], tNc[1], hlen);
+    w_kern_inverse_pass1<<<n_blocks_1, n_threads_per_block>>>(d_coeffs[0], d_coeffs[1], d_coeffs[2], d_coeffs[3], d_tmp1, d_tmp2, tNr[1], tNc[1], tNr[0], hlen);
+    w_kern_inverse_pass2<<<n_blocks_2, n_threads_per_block>>>(d_tmp1, d_tmp2, d_image, tNr[0], tNc[1], tNc[0], hlen);
 
     return 0;
 }
@@ -345,11 +343,11 @@ int w_inverse_separable_1d(DTYPE* d_image, DTYPE** d_coeffs, DTYPE* d_tmp, w_inf
 
     for (int i = levels-1; i >= 1; i--) {
         n_blocks = dim3(w_iDivUp(tNc[i], tpb), w_iDivUp(Nr, tpb), 1);
-        w_kern_inverse_pass2<<<n_blocks, n_threads_per_block>>>(d_coeffs[i], d_coeffs[i+1], d_tmp, Nr, tNc[i+1], hlen);
+        w_kern_inverse_pass2<<<n_blocks, n_threads_per_block>>>(d_coeffs[i], d_coeffs[i+1], d_tmp, Nr, tNc[i+1], tNc[i], hlen);
     }
     // First scale
     n_blocks = dim3(w_iDivUp(Nc, tpb), w_iDivUp(Nr, tpb), 1);
-    w_kern_inverse_pass2<<<n_blocks, n_threads_per_block>>>(d_coeffs[0], d_coeffs[1], d_image, Nr, tNc[1], hlen);
+    w_kern_inverse_pass2<<<n_blocks, n_threads_per_block>>>(d_coeffs[0], d_coeffs[1], d_image, Nr, tNc[1], tNc[0], hlen);
 
     return 0;
 }

@@ -9,8 +9,8 @@ __global__ void w_kern_forward_pass2(DTYPE* tmp_a1, DTYPE* tmp_a2, DTYPE* c_a, D
 int w_forward_separable(DTYPE* d_image, DTYPE** d_coeffs, DTYPE* d_tmp, w_info winfos);
 int w_forward_separable_1d(DTYPE* d_image, DTYPE** d_coeffs, DTYPE* d_tmp, w_info winfos);
 
-__global__ void w_kern_inverse_pass1(DTYPE* c_a, DTYPE* c_h, DTYPE* c_v, DTYPE* c_d, DTYPE* tmp1, DTYPE* tmp2, int Nr, int Nc, int hlen);
-__global__ void w_kern_inverse_pass2(DTYPE* tmp1, DTYPE* tmp2, DTYPE* img, int Nr, int Nc, int hlen);
+__global__ void w_kern_inverse_pass1(DTYPE* c_a, DTYPE* c_h, DTYPE* c_v, DTYPE* c_d, DTYPE* tmp1, DTYPE* tmp2, int Nr, int Nc, int Nr2, int hlen);
+__global__ void w_kern_inverse_pass2(DTYPE* tmp1, DTYPE* tmp2, DTYPE* img, int Nr, int Nc, int Nc2, int hlen);
 int w_inverse_separable(DTYPE* d_image, DTYPE** d_coeffs, DTYPE* d_tmp, w_info winfos);
 int w_inverse_separable_1d(DTYPE* d_image, DTYPE** d_coeffs, DTYPE* d_tmp, w_info winfos);
 
