@@ -57,7 +57,8 @@ int w_compute_filters_separable(const char* wname, int do_swt) {
 __global__ void w_kern_forward_pass1(DTYPE* img, DTYPE* tmp_a1, DTYPE* tmp_a2, int Nr, int Nc, int hlen) {
     int gidx = threadIdx.x + blockIdx.x*blockDim.x;
     int gidy = threadIdx.y + blockIdx.y*blockDim.y;
-    int Nc2 = Nc/2;
+    int Nc_is_odd = (Nc & 1);
+    int Nc2 = (Nc + Nc_is_odd)/2;
     if (gidy < Nr && gidx < Nc2) { // horiz subsampling : Input (Nr, Nc) => Output (Nr, Nc/2)
         int c, hL, hR;
         if (hlen & 1) { // odd kernel size
@@ -74,7 +75,6 @@ __global__ void w_kern_forward_pass1(DTYPE* img, DTYPE* tmp_a1, DTYPE* tmp_a2, i
         int jx2 = Nc - 1 - 2*gidx + c;
         DTYPE res_tmp_a1 = 0, res_tmp_a2 = 0;
         DTYPE img_val;
-        int Nc_is_odd = (Nc & 1);
 
         // Convolution with periodic boundaries extension.
         for (int jx = 0; jx <= hR+hL; jx++) {
@@ -98,7 +98,8 @@ __global__ void w_kern_forward_pass1(DTYPE* img, DTYPE* tmp_a1, DTYPE* tmp_a2, i
 __global__ void w_kern_forward_pass2(DTYPE* tmp_a1, DTYPE* tmp_a2, DTYPE* c_a, DTYPE* c_h, DTYPE* c_v, DTYPE* c_d, int Nr, int Nc, int hlen) {
     int gidx = threadIdx.x + blockIdx.x*blockDim.x;
     int gidy = threadIdx.y + blockIdx.y*blockDim.y;
-    int Nr2 = Nr/2;
+    int Nr_is_odd = (Nr & 1);
+    int Nr2 = (Nr + Nr_is_odd)/2;
     if (gidy < Nr2 && gidx < Nc) { // vertic subsampling : Input (Nr, Nc/2) => Output (Nr/2, Nc/2)
         int c, hL, hR;
         if (hlen & 1) { // odd kernel size
@@ -114,7 +115,7 @@ __global__ void w_kern_forward_pass2(DTYPE* tmp_a1, DTYPE* tmp_a2, DTYPE* c_a, D
         int jy1 = c - gidy*2;
         int jy2 = Nr - 1 - gidy*2 + c;
         DTYPE res_a = 0, res_h = 0, res_v = 0, res_d = 0;
-        int Nr_is_odd = (Nr & 1);
+
 
         // Convolution with periodic boundaries extension.
         for (int jy = 0; jy <= hR+hL; jy++) {
