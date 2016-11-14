@@ -1,5 +1,5 @@
 #include "haar.h"
-//~ #include "utils.h"
+#include "utils.h"
 
 // The sqrt(2) factor is applied after two HAAR_*, so it becomes a 0.5 factor
 #define HAAR_AVG(a, b) ((a+b))
@@ -10,26 +10,37 @@
 __global__ void kern_haar2d_fwd(DTYPE* img, DTYPE* c_a, DTYPE* c_h, DTYPE* c_v, DTYPE* c_d, int Nr, int Nc) {
     int gidx = threadIdx.x + blockIdx.x*blockDim.x;
     int gidy = threadIdx.y + blockIdx.y*blockDim.y;
-    Nr /= 2; Nc /= 2;
-    int Nc2 = Nc*2;
-    if (gidy < Nr && gidx < Nc) {
-        DTYPE a = img[(gidy*2)*Nc2 + (gidx*2)];
-        DTYPE b = img[(gidy*2)*Nc2 + (gidx*2+1)];
-        DTYPE c = img[(gidy*2+1)*Nc2 + (gidx*2)];
-        DTYPE d = img[(gidy*2+1)*Nc2 + (gidx*2+1)];
-        c_a[gidy* Nc + (gidx)] = 0.5*HAAR_AVG(HAAR_AVG(a, c), HAAR_AVG(b, d)); // A
-        c_v[gidy* Nc + (gidx)] = 0.5*HAAR_DIF(HAAR_AVG(a, c), HAAR_AVG(b, d)); // V
-        c_h[gidy* Nc + (gidx)] =  0.5*HAAR_AVG(HAAR_DIF(a, c), HAAR_DIF(b, d)); // H
-        c_d[gidy* Nc + (gidx)] = 0.5*HAAR_DIF(HAAR_DIF(a, c), HAAR_DIF(b, d)); // D
+    int Nr_is_odd = (Nr & 1);
+    int Nc_is_odd = (Nc & 1);
+    int Nr2 = (Nr + Nr_is_odd)/2;
+    int Nc2 = (Nc + Nc_is_odd)/2;
+    if (gidy < Nr2 && gidx < Nc2) {
+
+        // for odd N, image is virtually extended by repeating the last element
+        int posx0 = 2*gidx;
+        int posx1 = 2*gidx+1;
+        if ((Nc_is_odd) && (posx1 == Nc)) posx1--;
+        int posy0 = 2*gidy;
+        int posy1 = 2*gidy+1;
+        if ((Nr_is_odd) && (posy1 == Nr)) posy1--;
+
+        DTYPE a = img[posy0*Nc + posx0];
+        DTYPE b = img[posy0*Nc + posx1];
+        DTYPE c = img[posy1*Nc + posx0];
+        DTYPE d = img[posy1*Nc + posx1];
+
+        c_a[gidy* Nc2 + gidx] = 0.5*HAAR_AVG(HAAR_AVG(a, c), HAAR_AVG(b, d)); // A
+        c_v[gidy* Nc2 + gidx] = 0.5*HAAR_DIF(HAAR_AVG(a, c), HAAR_AVG(b, d)); // V
+        c_h[gidy* Nc2 + gidx] = 0.5*HAAR_AVG(HAAR_DIF(a, c), HAAR_DIF(b, d)); // H
+        c_d[gidy* Nc2 + gidx] = 0.5*HAAR_DIF(HAAR_DIF(a, c), HAAR_DIF(b, d)); // D
     }
 }
 
 
 // must be run with grid size = (2*Nr, 2*Nc) ; Nr = numrows of input
-__global__ void kern_haar2d_inv(DTYPE* img, DTYPE* c_a, DTYPE* c_h, DTYPE* c_v, DTYPE* c_d, int Nr, int Nc) {
+__global__ void kern_haar2d_inv(DTYPE* img, DTYPE* c_a, DTYPE* c_h, DTYPE* c_v, DTYPE* c_d, int Nr, int Nc, int Nr2, int Nc2) {
     int gidx = threadIdx.x + blockIdx.x*blockDim.x;
     int gidy = threadIdx.y + blockIdx.y*blockDim.y;
-    int Nr2 = Nr*2, Nc2 = Nc*2;
     if (gidy < Nr2 && gidx < Nc2) {
         DTYPE a = c_a[(gidy/2)*Nc + (gidx/2)];
         DTYPE b = c_v[(gidy/2)*Nc + (gidx/2)];
@@ -41,7 +52,7 @@ __global__ void kern_haar2d_inv(DTYPE* img, DTYPE* c_a, DTYPE* c_h, DTYPE* c_v, 
         if (gx1 == 1 && gy1 == 0) res = 0.5*HAAR_DIF(HAAR_AVG(a, c), HAAR_AVG(b, d));
         if (gx1 == 0 && gy1 == 1) res = 0.5*HAAR_AVG(HAAR_DIF(a, c), HAAR_DIF(b, d));
         if (gx1 == 1 && gy1 == 1) res = 0.5*HAAR_DIF(HAAR_DIF(a, c), HAAR_DIF(b, d));
-        img[(gidy)*Nc2 + gidx] = res;
+        img[gidy*Nc2 + gidx] = res;
     }
 
 }
@@ -49,7 +60,9 @@ __global__ void kern_haar2d_inv(DTYPE* img, DTYPE* c_a, DTYPE* c_h, DTYPE* c_v, 
 
 int haar_forward2d(DTYPE* d_image, DTYPE** d_coeffs, DTYPE* d_tmp, w_info winfos) {
     int Nr = winfos.Nr, Nc = winfos.Nc, levels = winfos.nlevels;
-    int Nc2 = Nc/2, Nr2 = Nr/2;
+    int Nc2 = Nc, Nr2 = Nr;
+    int Nc2_old = Nc2, Nr2_old = Nr2;
+    w_div2(&Nc2); w_div2(&Nr2);
     int tpb = 16; // TODO : tune for max perfs.
     DTYPE* d_tmp1, *d_tmp2;
     d_tmp1 = d_coeffs[0];
@@ -58,13 +71,13 @@ int haar_forward2d(DTYPE* d_image, DTYPE** d_coeffs, DTYPE* d_tmp, w_info winfos
     // First level
     dim3 n_blocks = dim3(w_iDivUp(Nc2, tpb), w_iDivUp(Nr2, tpb), 1);
     dim3 n_threads_per_block = dim3(tpb, tpb, 1);
-    kern_haar2d_fwd<<<n_blocks, n_threads_per_block>>>(d_image, d_coeffs[0], d_coeffs[1], d_coeffs[2], d_coeffs[3], Nr2*2, Nc2*2);
+    kern_haar2d_fwd<<<n_blocks, n_threads_per_block>>>(d_image, d_coeffs[0], d_coeffs[1], d_coeffs[2], d_coeffs[3], Nr, Nc);
 
     for (int i=1; i < levels; i++) {
-        Nc2 /= 2;
-        Nr2 /= 2;
+        Nc2_old = Nc2; Nr2_old = Nr2;
+        w_div2(&Nc2); w_div2(&Nr2);
         n_blocks = dim3(w_iDivUp(Nc2, tpb), w_iDivUp(Nr2, tpb), 1);
-        kern_haar2d_fwd<<<n_blocks, n_threads_per_block>>>(d_tmp1, d_tmp2, d_coeffs[3*i+1], d_coeffs[3*i+2], d_coeffs[3*i+3], Nr2*2, Nc2*2);
+        kern_haar2d_fwd<<<n_blocks, n_threads_per_block>>>(d_tmp1, d_tmp2, d_coeffs[3*i+1], d_coeffs[3*i+2], d_coeffs[3*i+3], Nr2_old, Nc2_old);
         w_swap_ptr(&d_tmp1, &d_tmp2);
     }
     if ((levels & 1) == 0) cudaMemcpy(d_coeffs[0], d_tmp1, Nr2*Nc2*sizeof(DTYPE), cudaMemcpyDeviceToDevice);
@@ -73,8 +86,17 @@ int haar_forward2d(DTYPE* d_image, DTYPE** d_coeffs, DTYPE* d_tmp, w_info winfos
 
 int haar_inverse2d(DTYPE* d_image, DTYPE** d_coeffs, DTYPE* d_tmp, w_info winfos) {
     int Nr = winfos.Nr, Nc = winfos.Nc, levels = winfos.nlevels;
-    Nr /= w_ipow2(levels);
-    Nc /= w_ipow2(levels);
+
+    // Table of sizes. FIXME: consider adding this in the w_info structure
+    int tNr[levels+1]; tNr[0] = Nr;
+    int tNc[levels+1]; tNc[0] = Nc;
+    for (int i = 1; i <= levels; i++) {
+        tNr[i] = tNr[i-1];
+        tNc[i] = tNc[i-1];
+        w_div2(tNr + i);
+        w_div2(tNc + i);
+    }
+
     int tpb = 16; // TODO : tune for max perfs.
     DTYPE* d_tmp1, *d_tmp2;
     d_tmp1 = d_coeffs[0];
@@ -83,17 +105,15 @@ int haar_inverse2d(DTYPE* d_image, DTYPE** d_coeffs, DTYPE* d_tmp, w_info winfos
     dim3 n_threads_per_block = dim3(tpb, tpb, 1);
     dim3 n_blocks;
     for (int i = levels-1; i >= 1; i--) {
-        n_blocks = dim3(w_iDivUp(Nc*2, tpb), w_iDivUp(Nr*2, tpb), 1);
-        kern_haar2d_inv<<<n_blocks, n_threads_per_block>>>(d_tmp2, d_tmp1, d_coeffs[3*i+1], d_coeffs[3*i+2], d_coeffs[3*i+3], Nr, Nc);
-        Nr *= 2;
-        Nc *= 2;
+        n_blocks = dim3(w_iDivUp(tNc[i], tpb), w_iDivUp(tNr[i], tpb), 1);
+        kern_haar2d_inv<<<n_blocks, n_threads_per_block>>>(d_tmp2, d_tmp1, d_coeffs[3*i+1], d_coeffs[3*i+2], d_coeffs[3*i+3], tNr[i+1], tNc[i+1], tNr[i], tNc[i]);
         w_swap_ptr(&d_tmp1, &d_tmp2);
     }
     if ((levels & 1) == 0) cudaMemcpy(d_coeffs[0], d_tmp1, Nr*Nc*sizeof(DTYPE), cudaMemcpyDeviceToDevice);
 
     // First level
     n_blocks = dim3(w_iDivUp(Nc*2, tpb), w_iDivUp(Nr*2, tpb), 1);
-    kern_haar2d_inv<<<n_blocks, n_threads_per_block>>>(d_image, d_coeffs[0], d_coeffs[1], d_coeffs[2], d_coeffs[3], Nr, Nc);
+    kern_haar2d_inv<<<n_blocks, n_threads_per_block>>>(d_image, d_coeffs[0], d_coeffs[1], d_coeffs[2], d_coeffs[3], tNr[1], tNc[1], Nr, Nc);
 
     return 0;
 }
