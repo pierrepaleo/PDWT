@@ -189,7 +189,7 @@ int w_forward_separable_1d(DTYPE* d_image, DTYPE** d_coeffs, DTYPE* d_tmp, w_inf
     // TODO: which block strategy for the "y" dimension ?
     dim3 n_blocks = dim3(w_iDivUp(Nc2, tpb), w_iDivUp(Nr, tpb), 1);
     dim3 n_threads_per_block = dim3(tpb, tpb, 1);
-    w_kern_forward_pass1<<<n_blocks, n_threads_per_block>>>(d_image, d_coeffs[0], d_coeffs[1], Nr, Nc2_old, hlen);
+    w_kern_forward_pass1<<<n_blocks, n_threads_per_block>>>(d_image, d_coeffs[0], d_coeffs[1], Nr, Nc, hlen);
     for (int i=1; i < levels; i++) {
         Nc2_old = Nc2;
         w_div2(&Nc2);
@@ -197,7 +197,7 @@ int w_forward_separable_1d(DTYPE* d_image, DTYPE** d_coeffs, DTYPE* d_tmp, w_inf
         w_kern_forward_pass1<<<n_blocks, n_threads_per_block>>>(d_tmp1, d_tmp2, d_coeffs[i+1], Nr, Nc2_old, hlen);
         w_swap_ptr(&d_tmp1, &d_tmp2);
     }
-    if ((levels & 1) == 0) cudaMemcpy(d_coeffs[0], d_tmp, Nr*Nc2*sizeof(DTYPE), cudaMemcpyDeviceToDevice);
+    if ((levels > 1) && ((levels & 1) == 0)) cudaMemcpy(d_coeffs[0], d_tmp, Nr*Nc2*sizeof(DTYPE), cudaMemcpyDeviceToDevice);
     return 0;
 }
 
@@ -294,9 +294,9 @@ __global__ void w_kern_inverse_pass2(DTYPE* tmp1, DTYPE* tmp2, DTYPE* img, int N
 }
 
 
+
 int w_inverse_separable(DTYPE* d_image, DTYPE** d_coeffs, DTYPE* d_tmp, w_info winfos) {
     int Nr = winfos.Nr, Nc = winfos.Nc, levels = winfos.nlevels, hlen = winfos.hlen;
-    int Nr2 = Nr, Nc2 = Nc;
     // Table of sizes. FIXME: consider adding this in the w_info structure
     int tNr[levels+1]; tNr[0] = Nr;
     int tNc[levels+1]; tNc[0] = Nc;
@@ -322,7 +322,7 @@ int w_inverse_separable(DTYPE* d_image, DTYPE** d_coeffs, DTYPE* d_tmp, w_info w
     }
     // First scale
     n_blocks_1 = dim3(w_iDivUp(tNc[1], tpb), w_iDivUp(tNr[0], tpb), 1);
-    n_blocks_2 = dim3(w_iDivUp(Nc2, tpb), w_iDivUp(Nr2, tpb), 1);
+    n_blocks_2 = dim3(w_iDivUp(Nc, tpb), w_iDivUp(Nr, tpb), 1);
     w_kern_inverse_pass1<<<n_blocks_1, n_threads_per_block>>>(d_coeffs[0], d_coeffs[1], d_coeffs[2], d_coeffs[3], d_tmp1, d_tmp2, tNr[1], tNc[1], tNr[0], hlen);
     w_kern_inverse_pass2<<<n_blocks_2, n_threads_per_block>>>(d_tmp1, d_tmp2, d_image, tNr[0], tNc[1], tNc[0], hlen);
 
@@ -334,11 +334,14 @@ int w_inverse_separable(DTYPE* d_image, DTYPE** d_coeffs, DTYPE* d_tmp, w_info w
 int w_inverse_separable_1d(DTYPE* d_image, DTYPE** d_coeffs, DTYPE* d_tmp, w_info winfos) {
     int Nr = winfos.Nr, Nc = winfos.Nc, levels = winfos.nlevels, hlen = winfos.hlen;
     // Table of sizes. FIXME: consider adding this in the w_info structure
-    int tNc[levels+1];
+    int tNc[levels+1]; tNc[0] = Nc;
     for (int i = 1; i <= levels; i++) {
         tNc[i] = tNc[i-1];
         w_div2(tNc + i);
     }
+    DTYPE* d_tmp1, *d_tmp2;
+    d_tmp1 = d_coeffs[0];
+    d_tmp2 = d_tmp;
 
     int tpb = 16; // TODO : tune for max perfs.
     dim3 n_blocks;
@@ -346,11 +349,13 @@ int w_inverse_separable_1d(DTYPE* d_image, DTYPE** d_coeffs, DTYPE* d_tmp, w_inf
 
     for (int i = levels-1; i >= 1; i--) {
         n_blocks = dim3(w_iDivUp(tNc[i], tpb), w_iDivUp(Nr, tpb), 1);
-        w_kern_inverse_pass2<<<n_blocks, n_threads_per_block>>>(d_coeffs[i], d_coeffs[i+1], d_tmp, Nr, tNc[i+1], tNc[i], hlen);
+        w_kern_inverse_pass2<<<n_blocks, n_threads_per_block>>>(d_tmp1, d_coeffs[i+1], d_tmp2, Nr, tNc[i+1], tNc[i], hlen);
+        w_swap_ptr(&d_tmp1, &d_tmp2);
     }
+    if ((levels > 1) && ((levels & 1) == 0)) cudaMemcpy(d_coeffs[0], d_tmp1, Nr*tNc[1]*sizeof(DTYPE), cudaMemcpyDeviceToDevice);
     // First scale
     n_blocks = dim3(w_iDivUp(Nc, tpb), w_iDivUp(Nr, tpb), 1);
-    w_kern_inverse_pass2<<<n_blocks, n_threads_per_block>>>(d_coeffs[0], d_coeffs[1], d_image, Nr, tNc[1], tNc[0], hlen);
+    w_kern_inverse_pass2<<<n_blocks, n_threads_per_block>>>(d_coeffs[0], d_coeffs[1], d_image, Nr, tNc[1], Nc, hlen);
 
     return 0;
 }
