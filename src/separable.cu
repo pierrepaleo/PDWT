@@ -71,22 +71,25 @@ __global__ void w_kern_forward_pass1(DTYPE* img, DTYPE* tmp_a1, DTYPE* tmp_a2, i
             hL = c;
             hR = c+1;
         }
-        int jx1 = c - 2*gidx;
-        int jx2 = Nc - 1 - 2*gidx + c;
         DTYPE res_tmp_a1 = 0, res_tmp_a2 = 0;
         DTYPE img_val;
 
         // Convolution with periodic boundaries extension.
         for (int jx = 0; jx <= hR+hL; jx++) {
-            int idx_x = gidx*2 - c + jx;
-            if (jx < jx1) idx_x += Nc;
-            else if (Nc_is_odd && jx == jx2+1) idx_x--; // if N is odd, repeat the right-most element
-            else if (jx > jx2) idx_x -= Nc;
-            else ;
 
-            img_val = img[(gidy*1)*Nc + idx_x]; // <=
+            int idx_x = gidx*2 - c + jx;
+
+            if (idx_x < 0) idx_x += (Nc + Nc_is_odd); // if N is odd, image is virtually extended
+            // no "else if", since idx_x can be > N-1  after being incremented
+            if (idx_x > Nc-1) {
+                if ((idx_x == Nc) && (Nc_is_odd)) idx_x--; // if N is odd, repeat the right-most element
+                else idx_x -= (Nc + Nc_is_odd); // if N is odd, image is virtually extended
+            }
+
+            img_val = img[gidy*Nc + idx_x];
             res_tmp_a1 += img_val * c_kern_L[hlen-1 - jx];
             res_tmp_a2 += img_val * c_kern_H[hlen-1 - jx];
+
         }
         tmp_a1[gidy* Nc2 + gidx] = res_tmp_a1;
         tmp_a2[gidy* Nc2 + gidx] = res_tmp_a2;
@@ -112,18 +115,18 @@ __global__ void w_kern_forward_pass2(DTYPE* tmp_a1, DTYPE* tmp_a2, DTYPE* c_a, D
             hL = c;
             hR = c+1;
         }
-        int jy1 = c - gidy*2;
-        int jy2 = Nr - 1 - gidy*2 + c;
         DTYPE res_a = 0, res_h = 0, res_v = 0, res_d = 0;
-
 
         // Convolution with periodic boundaries extension.
         for (int jy = 0; jy <= hR+hL; jy++) {
             int idx_y = gidy*2 - c + jy;
-            if (jy < jy1) idx_y += Nr;
-            else if (Nr_is_odd && jy == jy2+1) idx_y--; // if N is odd, repeat the right-most element
-            else if (jy > jy2) idx_y -= Nr;
-            else ;
+
+            if (idx_y < 0) idx_y += (Nr + Nr_is_odd); // if N is odd, image is virtually extended
+            // no "else if", since idx_y can be > N-1  after being incremented
+            if (idx_y > Nr-1) {
+                if ((idx_y == Nr) && (Nr_is_odd)) idx_y--; // if N is odd, repeat the right-most element
+                else idx_y -= (Nr + Nr_is_odd); // if N is odd, image is virtually extended
+            }
 
             res_a += tmp_a1[idx_y*Nc + gidx] * c_kern_L[hlen-1 - jy];
             res_h += tmp_a1[idx_y*Nc + gidx] * c_kern_H[hlen-1 - jy];
