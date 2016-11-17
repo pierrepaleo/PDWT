@@ -442,7 +442,7 @@ int Wavelets::get_coeff(DTYPE* coeff, int num) {
         int scale;
         if (num == 0) scale = winfos.nlevels;
         else scale = ((num-1)/3) +1;
-        for (int i = 0; i < scale; i++) {
+        if (!winfos.do_swt) for (int i = 0; i < scale; i++) {
             w_div2(&Nr2);
             w_div2(&Nc2);
         }
@@ -454,7 +454,7 @@ int Wavelets::get_coeff(DTYPE* coeff, int num) {
         int scale;
         if (num == 0) scale = winfos.nlevels;
         else scale = num;
-        for (int i = 0; i < scale; i++) {
+        if (!winfos.do_swt) for (int i = 0; i < scale; i++) {
             w_div2(&Nc2);
         }
     }

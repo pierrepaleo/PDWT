@@ -3,7 +3,9 @@ TODO LIST
 - Modify inverse haar (and related) to avoid extra memcpy
 - DWT: Image padding for non-friendly sizes (with warning)
 - Nonseparable SWT re-computes the inverse filters at each inversion (for memory requirements). See if there is a workaround.
-- ISWT : only appcoeffs at last scale are used (cf Matlab) : Don't store the other appcoeffs
+- ISWT:
+    - Either return all app coeffs (can be interesing for multi-resolution)
+    - Or only store appcoeffs at last scale (for eg. Matlab only uses the last appcoeff for iswt)
 - More threshold types
 - Compute norm related to threshold (eg. soft/L1, group-lasso, etc)
 - User-defined target CUDA device
