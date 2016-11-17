@@ -137,7 +137,9 @@ Wavelets::Wavelets(
     else if (ndim == 2) d_coeffs_new = w_create_coeffs_buffer(winfos);
     else {
         printf("ERROR: ndim=%d is not implemented\n", ndim);
-        exit(1);
+        //~ exit(1);
+        //~ throw std::runtime_error("Error on ndim");
+        state = W_CREATION_ERROR;
     }
     d_coeffs = d_coeffs_new;
 
@@ -153,7 +155,8 @@ Wavelets::Wavelets(
     else hlen = w_compute_filters(wname, 1, do_swt);
     if (hlen == 0) {
         printf("ERROR: unknown wavelet name %s\n", wname);
-        exit(1);
+        //~ exit(1);
+        state = W_CREATION_ERROR;
     }
     winfos.hlen = hlen;
 
@@ -172,7 +175,8 @@ Wavelets::Wavelets(
     // TODO
     if (do_cycle_spinning && ndim == 1) {
         puts("ERROR: cycle spinning is not implemented for 1D. Use SWT instead.");
-        exit(1);
+        //~ exit(1);
+        state = W_CREATION_ERROR;
     }
 
 }
@@ -210,7 +214,8 @@ Wavelets::Wavelets(const Wavelets &W) :
     }
     else {
         puts("ERROR: 3D wavelets not implemented yet");
-        exit(-1);
+        //~ exit(-1);
+        state = W_CREATION_ERROR;
     }
 }
 
@@ -227,6 +232,11 @@ Wavelets::~Wavelets(void) {
 
 /// Method : forward
 void Wavelets::forward(void) {
+    if (state == W_CREATION_ERROR) {
+        puts("Warning: forward transform not computed, as there was an error when creating the wavelets");
+        return;
+    }
+    // TODO: handle W_FORWARD_ERROR with return codes of transforms
     if (do_cycle_spinning) {
         current_shift_r = rand() % winfos.Nr;
         current_shift_c = rand() % winfos.Nc;
@@ -262,6 +272,11 @@ void Wavelets::inverse(void) {
         puts("Warning: W.inverse() has already been run. Inverse is available in W.get_image()");
         return;
     }
+    if (state == W_FORWARD_ERROR || state == W_THRESHOLD_ERROR) {
+        puts("Warning: inverse transform not computed, as there was an error in a previous stage");
+        return;
+    }
+    // TODO: handle W_INVERSE_ERROR with return codes of inverse transforms
     if (winfos.ndims == 1) {
         if ((winfos.hlen == 2) && (!winfos.do_swt)) haar_inverse1d(d_image, d_coeffs, d_tmp, winfos);
         else {
@@ -295,6 +310,7 @@ void Wavelets::soft_threshold(DTYPE beta, int do_thresh_appcoeffs, int normalize
         return;
     }
     w_call_soft_thresh(d_coeffs, beta, winfos, do_thresh_appcoeffs, normalize, threshold_cousins);
+    // TODO: handle W_THRESHOLD_ERROR from a return code
 }
 
 /// Method : hard thresholding
@@ -304,6 +320,7 @@ void Wavelets::hard_threshold(DTYPE beta, int do_thresh_appcoeffs, int normalize
         return;
     }
     w_call_hard_thresh(d_coeffs, beta, winfos, do_thresh_appcoeffs, normalize);
+    // TODO: handle W_THRESHOLD_ERROR from a return code
 }
 
 /// Method : shrink (L2 proximal)
@@ -313,6 +330,7 @@ void Wavelets::shrink(DTYPE beta, int do_thresh_appcoeffs) {
         return;
     }
     w_shrink(d_coeffs, beta, winfos, do_thresh_appcoeffs);
+    // TODO: handle W_THRESHOLD_ERROR from a return code
 }
 
 

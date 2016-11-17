@@ -6,10 +6,14 @@
 // Possible states of the Wavelet class.
 // It prevents, for example, W.inverse() from being run twice (since W.d_coeffs[0] is modified)
 typedef enum w_state {
-    W_INIT,      // The class has just been initialized (coeffs not computed)
-    W_FORWARD,   // W.forward() has just been performed (coeffs computed)
-    W_INVERSE,   // W.inverse() has just been performed (d_image modified, coeffs modified !)
-    W_THRESHOLD  // The coefficients have been modified
+    W_INIT,             // The class has just been initialized (coeffs not computed)
+    W_FORWARD,          // W.forward() has just been performed (coeffs computed)
+    W_INVERSE,          // W.inverse() has just been performed (d_image modified, coeffs modified !)
+    W_THRESHOLD,        // The coefficients have been modified
+    W_CREATION_ERROR,   // Error when creating the Wavelets instance
+    W_FORWARD_ERROR,    // Error when computing the forward transform
+    W_INVERSE_ERROR,    // Error when computing the inverse transform
+    W_THRESHOLD_ERROR,  // Error when thresholding the coefficients
 } w_state;
 
 
