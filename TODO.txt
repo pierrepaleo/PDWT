@@ -1,7 +1,6 @@
 TODO LIST
 
 - Modify inverse haar (and related) to avoid extra memcpy
-- DWT: Image padding for non-friendly sizes (with warning)
 - Nonseparable SWT re-computes the inverse filters at each inversion (for memory requirements). See if there is a workaround.
 - ISWT:
     - Either return all app coeffs (can be interesing for multi-resolution)
@@ -14,10 +13,10 @@ TODO LIST
 
 -- DONE :
 
-- Refactoring [OK]:
+- All transform work for "odd" sizes
+- Refactoring :
     - Create a structure containing informations on WT. Used by Wavelets() class, but also by common functions (to avoid kilometers-long functions signature)
     - Not all files in same folder (test, src, doc, build)
     - Remove useless files (profiling) and put i/o in "test"
     - No more #include "*.cu" !
-- TYPE template to support both double and simple precision [OK]
-
+- TYPE template to support both double and simple precision

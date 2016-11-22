@@ -9,7 +9,7 @@ For example, the easy interface and thresholding functions make it interesting f
 
 ## Features
 
-* 1D and 2D transform, multi-levels
+* 1D and 2D transform, multi-levels, arbitrary sizes
 * Support of batched 1D transform
 * Separable and non-separable transforms
 * DWT and SWT, both in separable/nonseparable mode
@@ -25,8 +25,7 @@ All the transforms are computed with the **periodic boundary extension** (the di
 
 ## Current limitations
 
-* For DWT, an image can be transformed up to a scale "n" if its dimensions are a multiple of 2^n. This limitation does not apply for SWT.
-* 3D is not handled at the moment. This should come in the future.
+* 3D is not handled at the moment.
 * Only the periodic boundary extension is implemented.
 * The parallel part is implemented in CUDA, so only Nvidia GPUs can be used.
 
