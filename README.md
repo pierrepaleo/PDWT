@@ -9,7 +9,7 @@ For example, the easy interface and thresholding functions make it interesting f
 
 ## Features
 
-* 1D and 2D transform, multi-levels, arbitrary sizes
+* 1D and 2D transform and their inverses, multi-levels, arbitrary sizes
 * Support of batched 1D transform
 * Separable and non-separable transforms
 * DWT and SWT, both in separable/nonseparable mode
@@ -18,10 +18,11 @@ For example, the easy interface and thresholding functions make it interesting f
 * Thresholding and norms utilities
 * Random shift utility for translation-invariant denoising
 * Simple interface (see examples)
-* Python binding available
-* Results compatible with Matlab wavelet toolbox / Python pywt.
+* [Python binding available](https://github.com/pierrepaleo/pypwt)
+* Results compatible with Matlab wavelet toolbox / Python pywt
+* Library can be compiled to work on single (float32) or double (float64) precision.
 
-All the transforms are computed with the **periodic boundary extension** (the dimensions are halved at each scale).
+All the transforms are computed with the **periodic boundary extension** (the dimensions are halved at each scale, except for SWT).
 
 ## Current limitations
 
@@ -50,7 +51,7 @@ make demo
 ### Running the example
 
 To run the test, you need a raw image in 32 bits floating point precision format.
-As PDWT was primarily written for data crunching, the I/O part is not addressed : the input and output of PDWT are float arrays.
+As PDWT was primarily written for data crunching, the I/O part is not addressed : the input and output of PDWT are float (or double, if compiled accordingly with `make libpdwtd.so`) arrays.
 
 If you have python and scipy installed, you can generate an image input file with
 

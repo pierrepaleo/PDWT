@@ -1,5 +1,8 @@
 CHANGELOG
 
+Version 0.7 (22/11/2016)
+- Transforms (including SWT) and their inverses now support odd-sized input data.
+
 Version 0.5 (20/09/2016)
 - Support of double precision: the library can be built for double precision computations with "make libpdwtd.so".
 
