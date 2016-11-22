@@ -13,7 +13,7 @@ typedef enum w_state {
     W_CREATION_ERROR,   // Error when creating the Wavelets instance
     W_FORWARD_ERROR,    // Error when computing the forward transform
     W_INVERSE_ERROR,    // Error when computing the inverse transform
-    W_THRESHOLD_ERROR,  // Error when thresholding the coefficients
+    W_THRESHOLD_ERROR   // Error when thresholding the coefficients
 } w_state;
 
 
