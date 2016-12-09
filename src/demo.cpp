@@ -76,11 +76,9 @@ int main(int argc, char **argv) {
 
     // Create the wavelet
     Wavelets W(img, Nr, Nc, wname, nlevels, 1, do_separable, do_cycle_spinning, do_swt);
-    W.print_informations();
-    nlevels = W.winfos.nlevels;
 
-    // Example of custom filter (here: LeGall 9/7 lossy wavelet)
     /*
+    // Example of custom filter (here: LeGall 9/7 lossy wavelet)
     int len = 10;
     float* filter1, *filter2, *ifilter1, *ifilter2;
     filter1 = (float*) calloc(len, sizeof(float));
@@ -128,10 +126,13 @@ int main(int argc, char **argv) {
     ifilter2[7] = 0.016864118443 ;
     ifilter2[8] = 0.026748757411 ;
 
-    W.set_filters_forward(len, filter1, filter2);
+    char* filtername = (char*) "CDF 9/7";
+    W.set_filters_forward(filtername, len, filter1, filter2);
     W.set_filters_inverse(ifilter1, ifilter2);
     */
-
+    
+    W.print_informations();
+    nlevels = W.winfos.nlevels;
 
     // Perform forward WT with current configuration
     W.forward();
