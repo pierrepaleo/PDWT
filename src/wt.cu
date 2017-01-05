@@ -330,6 +330,17 @@ void Wavelets::shrink(DTYPE beta, int do_thresh_appcoeffs) {
     w_shrink(d_coeffs, beta, winfos, do_thresh_appcoeffs);
     // TODO: handle W_THRESHOLD_ERROR from a return code
 }
+/// Method : projection onto the L-infinity ball (infinity norm proximal, i.e dual L1 norm proximal)
+void Wavelets::proj_linf(DTYPE beta, int do_thresh_appcoeffs) {
+    if (state == W_INVERSE) {
+        puts("Warning: Wavelets(): cannot threshold coefficients, as they were modified by W.inverse()");
+        return;
+    }
+    w_call_proj_linf(d_coeffs, beta, winfos, do_thresh_appcoeffs);
+    // TODO: handle W_THRESHOLD_ERROR from a return code
+}
+
+
 
 
 
@@ -419,7 +430,7 @@ void Wavelets::set_coeff(DTYPE* coeff, int num, int mem_is_on_device) { // There
         int scale;
         if (num == 0) scale = winfos.nlevels;
         else scale = ((num-1)/3) +1;
-        for (int i = 0; i < scale; i++) {
+        if (!winfos.do_swt) for (int i = 0; i < scale; i++) {
             w_div2(&Nr2);
             w_div2(&Nc2);
         }
@@ -431,7 +442,7 @@ void Wavelets::set_coeff(DTYPE* coeff, int num, int mem_is_on_device) { // There
         int scale;
         if (num == 0) scale = winfos.nlevels;
         else scale = num;
-        for (int i = 0; i < scale; i++) {
+        if (!winfos.do_swt) for (int i = 0; i < scale; i++) {
             w_div2(&Nc2);
         }
     }
