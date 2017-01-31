@@ -1,6 +1,7 @@
 #include "nonseparable.h"
 #include "common.h"
 
+
 // outer product of arrays "a", "b" of length "len"
 DTYPE* w_outer(DTYPE* a, DTYPE* b, int len) {
     DTYPE* res = (DTYPE*) calloc(len*len, sizeof(DTYPE));

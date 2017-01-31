@@ -21,6 +21,10 @@
   }
 
 
+// FIXME: temp. workaround
+#define MAX_FILTER_WIDTH 40
+
+
 
 /// ****************************************************************************
 /// ******************** Wavelets class ****************************************
@@ -229,10 +233,19 @@ Wavelets::~Wavelets(void) {
 }
 
 /// Method : forward
-void Wavelets::forward(void) {
+float Wavelets::forward(void) {
+
+        // PROFILING
+    cudaEvent_t tstart, tstop;
+    cudaEventCreate(&tstart); cudaEventCreate(&tstop);
+    float elapsedTime;
+    cudaEventRecord(tstart, 0);
+    // --- PROFILING
+
+
     if (state == W_CREATION_ERROR) {
         puts("Warning: forward transform not computed, as there was an error when creating the wavelets");
-        return;
+        return -1;
     }
     // TODO: handle W_FORWARD_ERROR with return codes of transforms
     if (do_cycle_spinning) {
@@ -260,9 +273,17 @@ void Wavelets::forward(void) {
             }
         }
     }
+
+        // PROFILING
+    cudaEventRecord(tstop, 0); cudaEventSynchronize(tstop); cudaEventElapsedTime(&elapsedTime, tstart, tstop);
+    // --- PROFILING
+
     // else: not implemented yet
 
     state = W_FORWARD;
+
+        //////
+    return elapsedTime;
 }
 /// Method : inverse
 void Wavelets::inverse(void) {
@@ -565,6 +586,15 @@ int Wavelets::set_filters_forward(char* filtername, uint len, DTYPE* filter1, DT
     }
     winfos.hlen = len;
     strncpy(wname, filtername, 128);
+
+//D
+puts("exiting set_filters");
+float img[512];
+cudaMemcpyFromSymbol(img, c_kern_L, len*sizeof(DTYPE), 0, cudaMemcpyDeviceToHost);
+for (int jj = 0; jj < len; jj++) printf("%f ", img[jj]);
+//-
+
+
     return 0;
 }
 
@@ -593,6 +623,15 @@ int Wavelets::set_filters_inverse(DTYPE* filter1, DTYPE* filter2, DTYPE* filter3
             return -3;
         }
     }
+
+//D
+puts("exiting set_filters_inverse");
+float img[512];
+cudaMemcpyFromSymbol(img, c_kern_L, len*sizeof(DTYPE), 0, cudaMemcpyDeviceToHost);
+for (int jj = 0; jj < len; jj++) printf("%f ", img[jj]);
+//-
+
+
     return 0;
 }
 

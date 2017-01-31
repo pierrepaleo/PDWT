@@ -8,8 +8,6 @@
 #define SQRT_2 1.4142135623730951
 #include <cublas.h>
 
-
-
 /// soft thresholding of the detail coefficients (2D)
 /// Must be lanched with block size (Nc, Nr) : the size of the current coefficient vector
 __global__ void w_kern_soft_thresh(DTYPE* c_h, DTYPE* c_v, DTYPE* c_d, DTYPE beta, int Nr, int Nc) {
@@ -449,6 +447,7 @@ void w_add_coeffs(DTYPE** dst, DTYPE** src, w_info winfos, DTYPE alpha) {
 }
 
 
+/// dst = dst + alpha*src
 void w_add_coeffs_1d(DTYPE** dst, DTYPE** src, w_info winfos, DTYPE alpha) {
     int Nr = winfos.Nr, Nc = winfos.Nc, do_swt = winfos.do_swt, nlevels = winfos.nlevels;
     // Det Coeffs

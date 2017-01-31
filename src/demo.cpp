@@ -49,12 +49,14 @@ int main(int argc, char **argv) {
 
     // Read image
     int Nr = 512, Nc = 512;
-    float* img = read_dat_file_float("test/lena.dat", Nr*Nc);
+    //~ float* img = read_dat_file_float("test/lena.dat", Nr*Nc);
+    float* img = read_dat_file_float("/home/paleo/tmp/lenagray.png.dat", Nr*Nc);
+
     if (img == NULL) exit(1);
     //~ Nr = 1; // uncomment for 1D transform
     int what = 0;
     char wname[128];
-    int nlevels,do_separable = 1, do_swt = 0;
+    int nlevels, do_separable = 1, do_swt = 0;
     int do_cycle_spinning = 0;
 
     if (argc < 4) {
@@ -77,8 +79,8 @@ int main(int argc, char **argv) {
     // Create the wavelet
     Wavelets W(img, Nr, Nc, wname, nlevels, 1, do_separable, do_cycle_spinning, do_swt);
 
-    /*
-    // Example of custom filter (here: LeGall 9/7 lossy wavelet)
+/*
+    // Example of custom filter (here: CDF 9/7 wavelet)
     int len = 10;
     float* filter1, *filter2, *ifilter1, *ifilter2;
     filter1 = (float*) calloc(len, sizeof(float));
@@ -129,14 +131,61 @@ int main(int argc, char **argv) {
     char* filtername = (char*) "CDF 9/7";
     W.set_filters_forward(filtername, len, filter1, filter2);
     W.set_filters_inverse(ifilter1, ifilter2);
-    */
-    
-    W.print_informations();
+*/
+
+
+    // Example of custom filter (here: LeGall 5/3 wavelet -- see "Document and Image compression", Barni, 2006)
+    float* filter1, *filter2, *ifilter1, *ifilter2;
+    filter1 = (float*) calloc(6, sizeof(float));
+    filter2 = (float*) calloc(6, sizeof(float));
+    ifilter1 = (float*) calloc(6, sizeof(float));
+    ifilter2 = (float*) calloc(6, sizeof(float));
+
+    filter1[0] = 0.0;
+    filter1[1] = -1.0/8;
+    filter1[2] = 2.0/8;
+    filter1[3] = 6.0/8;
+    filter1[4] = 2.0/8;
+    filter1[5] = -1.0/8;
+
+    filter2[0] = 0;
+    filter2[1] = -0.5;
+    filter2[2] = 1.0;
+    filter2[3] = -0.5;
+    filter2[4] = 0.0;
+    filter2[5] = 0;
+
+    ifilter1[0] = 0;
+    ifilter1[1] = 0.5;
+    ifilter1[2] = 1;
+    ifilter1[3] = 0.5;
+    ifilter1[4] = 0;
+    ifilter1[5] = 0;
+
+    ifilter2[0] = -1.0/8;
+    ifilter2[1] = -2.0/8;
+    ifilter2[2] = 6.0/8;
+    ifilter2[3] = -2.0/8;
+    ifilter2[4] = -1.0/8;
+
+    char* filtername = (char*) "LeGall 5/3";
+    W.set_filters_forward(filtername, 6, filter1, filter2);
+    W.set_filters_inverse(ifilter1, ifilter2);
+
+
+
+
+
+
+
     nlevels = W.winfos.nlevels;
+    W.print_informations();
+
 
     // Perform forward WT with current configuration
-    W.forward();
+    float t = W.forward();
     puts("Forward OK");
+    printf("T = %f\n", t);
 
     float* thecoeffs = (float*) calloc(Nr*Nc, sizeof(float)); // larger than needed
     int nels = W.get_coeff(thecoeffs, 0); //3*(nlevels-1)+3);

@@ -1,5 +1,8 @@
 TODO LIST
 
+- In demo: Enable custom transform even when "haar" is selected (=> modify compute_filters() which returns too son with hlen = 2)
+- max_lev is log2(N/(hlen-1)) !
+- Better mechanism for custom wavelets. Should allow > 40 coeffs
 - Modify inverse haar (and related) to avoid extra memcpy
 - Nonseparable SWT re-computes the inverse filters at each inversion (for memory requirements). See if there is a workaround.
 - Update filters coefficients in filters.cpp, to be compatible with PyWavelets.
