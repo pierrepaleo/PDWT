@@ -587,14 +587,6 @@ int Wavelets::set_filters_forward(char* filtername, uint len, DTYPE* filter1, DT
     winfos.hlen = len;
     strncpy(wname, filtername, 128);
 
-//D
-puts("exiting set_filters");
-float img[512];
-cudaMemcpyFromSymbol(img, c_kern_L, len*sizeof(DTYPE), 0, cudaMemcpyDeviceToHost);
-for (int jj = 0; jj < len; jj++) printf("%f ", img[jj]);
-//-
-
-
     return 0;
 }
 
@@ -623,14 +615,6 @@ int Wavelets::set_filters_inverse(DTYPE* filter1, DTYPE* filter2, DTYPE* filter3
             return -3;
         }
     }
-
-//D
-puts("exiting set_filters_inverse");
-float img[512];
-cudaMemcpyFromSymbol(img, c_kern_L, len*sizeof(DTYPE), 0, cudaMemcpyDeviceToHost);
-for (int jj = 0; jj < len; jj++) printf("%f ", img[jj]);
-//-
-
 
     return 0;
 }

@@ -53,13 +53,6 @@ int w_compute_filters_separable(const char* wname, int do_swt) {
     cudaMemcpyToSymbol(c_kern_IL, f1_il, hlen*sizeof(DTYPE), 0, cudaMemcpyHostToDevice);
     cudaMemcpyToSymbol(c_kern_IH, f1_ih, hlen*sizeof(DTYPE), 0, cudaMemcpyHostToDevice);
 
-//D
-puts("exiting compute_filters");
-float img[512];
-cudaMemcpyFromSymbol(img, c_kern_L, hlen*sizeof(DTYPE), 0, cudaMemcpyDeviceToHost);
-for (int jj = 0; jj < hlen; jj++) printf("%f ", img[jj]);
-//-
-
     return hlen;
 }
 
@@ -182,18 +175,6 @@ int w_forward_separable(DTYPE* d_image, DTYPE** d_coeffs, DTYPE* d_tmp, w_info w
     dim3 n_blocks_2 = dim3(w_iDivUp(Nc2, tpb), w_iDivUp(Nr2, tpb), 1);
     dim3 n_threads_per_block = dim3(tpb, tpb, 1);
     w_kern_forward_pass1<<<n_blocks_1, n_threads_per_block>>>(d_image, d_tmp1, d_tmp2, Nr2_old, Nc2_old, hlen);
-//D
-float* img = (float*) calloc(512*512, sizeof(float));
-cudaMemcpy(img, d_tmp, 512*512*sizeof(float), cudaMemcpyDeviceToHost);
-#include "io.h"
-write_dat_file_float("test.dat", img, 512*512);
-memset(img, 0, 512*512*4);
-printf("> %d\n", hlen);
-cudaMemcpyFromSymbol(img, c_kern_L, hlen*sizeof(DTYPE), 0, cudaMemcpyDeviceToHost);
-for (int jj = 0; jj < hlen; jj++) printf("%f ", img[jj]);
-
-//-
-
     w_kern_forward_pass2<<<n_blocks_2, n_threads_per_block>>>(d_tmp1, d_tmp2, d_coeffs[0], d_coeffs[1], d_coeffs[2], d_coeffs[3], Nr2_old, Nc2, hlen);
 
     for (int i=1; i < levels; i++) {
