@@ -1,18 +1,15 @@
 #include "separable.h"
 #include "common.h"
 
+#ifdef SEPARATE_COMPILATION
 // Required for separate compilation (see Makefile)
-#ifndef CONSTMEM_FILTERS
-#define CONSTMEM_FILTERS
+#ifndef CONSTMEM_FILTERS_S
+#define CONSTMEM_FILTERS_S
 __constant__ DTYPE c_kern_L[MAX_FILTER_WIDTH];
 __constant__ DTYPE c_kern_H[MAX_FILTER_WIDTH];
 __constant__ DTYPE c_kern_IL[MAX_FILTER_WIDTH];
 __constant__ DTYPE c_kern_IH[MAX_FILTER_WIDTH];
-
-__constant__ DTYPE c_kern_LL[MAX_FILTER_WIDTH * MAX_FILTER_WIDTH];
-__constant__ DTYPE c_kern_LH[MAX_FILTER_WIDTH * MAX_FILTER_WIDTH];
-__constant__ DTYPE c_kern_HL[MAX_FILTER_WIDTH * MAX_FILTER_WIDTH];
-__constant__ DTYPE c_kern_HH[MAX_FILTER_WIDTH * MAX_FILTER_WIDTH];
+#endif
 #endif
 
 
@@ -55,6 +52,28 @@ int w_compute_filters_separable(const char* wname, int do_swt) {
 
     return hlen;
 }
+
+
+int w_set_filters_forward(DTYPE* filter1, DTYPE* filter2, uint len) {
+    if (cudaMemcpyToSymbol(c_kern_L, filter1, len*sizeof(DTYPE), 0, cudaMemcpyHostToDevice) != cudaSuccess
+        || cudaMemcpyToSymbol(c_kern_H, filter2, len*sizeof(DTYPE), 0, cudaMemcpyHostToDevice) != cudaSuccess)
+    {
+        return -3;
+    }
+    return 0;
+}
+
+int w_set_filters_inverse(DTYPE* filter1, DTYPE* filter2, uint len) {
+    if (cudaMemcpyToSymbol(c_kern_IL, filter1, len*sizeof(DTYPE), 0, cudaMemcpyHostToDevice) != cudaSuccess
+        || cudaMemcpyToSymbol(c_kern_IH, filter2, len*sizeof(DTYPE), 0, cudaMemcpyHostToDevice) != cudaSuccess)
+    {
+        return -3;
+    }
+    return 0;
+}
+
+
+
 
 
 

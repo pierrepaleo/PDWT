@@ -3,6 +3,10 @@
 #include "utils.h"
 
 int w_compute_filters_separable(const char* wname, int do_swt);
+int w_set_filters_forward(DTYPE* filter1, DTYPE* filter2, uint len);
+int w_set_filters_inverse(DTYPE* filter1, DTYPE* filter2, uint len);
+
+
 __global__ void w_kern_forward_pass1(DTYPE* img, DTYPE* tmp_a1, DTYPE* tmp_a2, int Nr, int Nc, int hlen);
 __global__ void w_kern_forward_pass2(DTYPE* tmp_a1, DTYPE* tmp_a2, DTYPE* c_a, DTYPE* c_h, DTYPE* c_v, DTYPE* c_d, int Nr, int Nc, int hlen);
 int w_forward_separable(DTYPE* d_image, DTYPE** d_coeffs, DTYPE* d_tmp, w_info winfos);

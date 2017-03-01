@@ -543,47 +543,39 @@ void Wavelets::print_informations() {
 /// Provide a custom filter bank to the current Wavelet instance.
 /// If do_separable = 1, the filters are expected to be L, H.
 /// Otherwise, the filters are expected to be A, H, V, D (square size)
+// We cannot directly use the __constant__ symbols (unless with separate compilation),
+// hence a further indirection in (non)separable.cu where these symbols are defined
 int Wavelets::set_filters_forward(char* filtername, uint len, DTYPE* filter1, DTYPE* filter2, DTYPE* filter3, DTYPE* filter4) {
+    int res = 0;
     if (len > MAX_FILTER_WIDTH) {
         printf("ERROR: Wavelets.set_filters_forward(): filter length (%d) exceeds the maximum size (%d)\n", len, MAX_FILTER_WIDTH);
         return -1;
     }
     if (do_separable) {
-        if (cudaMemcpyToSymbol(c_kern_L, filter1, len*sizeof(DTYPE), 0, cudaMemcpyHostToDevice) != cudaSuccess
-            || cudaMemcpyToSymbol(c_kern_H, filter2, len*sizeof(DTYPE), 0, cudaMemcpyHostToDevice) != cudaSuccess)
-        {
-            return -3;
-        }
+        res = w_set_filters_forward(filter1, filter2, len);
     }
     else {
         if (filter3 == NULL || filter4 == NULL) {
             puts("ERROR: Wavelets.set_filters_forward(): expected argument 4 and 5 for non-separable filtering");
             return -2;
         }
-        if (cudaMemcpyToSymbol(c_kern_LL, filter1, len*len*sizeof(DTYPE), 0, cudaMemcpyHostToDevice) != cudaSuccess
-            || cudaMemcpyToSymbol(c_kern_LH, filter2, len*len*sizeof(DTYPE), 0, cudaMemcpyHostToDevice) != cudaSuccess
-            || cudaMemcpyToSymbol(c_kern_HL, filter3, len*len*sizeof(DTYPE), 0, cudaMemcpyHostToDevice) != cudaSuccess
-            || cudaMemcpyToSymbol(c_kern_HH, filter4, len*len*sizeof(DTYPE), 0, cudaMemcpyHostToDevice) != cudaSuccess)
-        {
-            return -3;
-        }
+        res = w_set_filters_forward_nonseparable(filter1, filter2, filter3, filter4, len);
     }
     winfos.hlen = len;
     strncpy(wname, filtername, 128);
 
-    return 0;
+    return res;
 }
 
 /// Here the filters are assumed to be of the same size of those provided to set_filters_forward()
+// We cannot directly use the __constant__ symbols (unless with separate compilation),
+// hence a further indirection in (non)separable.cu where these symbols are defined
 int Wavelets::set_filters_inverse(DTYPE* filter1, DTYPE* filter2, DTYPE* filter3, DTYPE* filter4) {
     uint len = winfos.hlen;
+    int res = 0;
     if (do_separable) {
         // ignoring args 4 and 5
-        if (cudaMemcpyToSymbol(c_kern_IL, filter1, len*sizeof(DTYPE), 0, cudaMemcpyHostToDevice) != cudaSuccess
-            || cudaMemcpyToSymbol(c_kern_IH, filter2, len*sizeof(DTYPE), 0, cudaMemcpyHostToDevice) != cudaSuccess)
-        {
-            return -3;
-        }
+        res = w_set_filters_inverse(filter1, filter2, len);
     }
     else {
         if (filter3 == NULL || filter4 == NULL) {
@@ -591,16 +583,10 @@ int Wavelets::set_filters_inverse(DTYPE* filter1, DTYPE* filter2, DTYPE* filter3
             return -2;
         }
         // The same symbols are used for the inverse filters
-        if (cudaMemcpyToSymbol(c_kern_LL, filter1, len*len*sizeof(DTYPE), 0, cudaMemcpyHostToDevice) != cudaSuccess
-            || cudaMemcpyToSymbol(c_kern_LH, filter2, len*len*sizeof(DTYPE), 0, cudaMemcpyHostToDevice) != cudaSuccess
-            || cudaMemcpyToSymbol(c_kern_HL, filter3, len*len*sizeof(DTYPE), 0, cudaMemcpyHostToDevice) != cudaSuccess
-            || cudaMemcpyToSymbol(c_kern_HH, filter4, len*len*sizeof(DTYPE), 0, cudaMemcpyHostToDevice) != cudaSuccess)
-        {
-            return -3;
-        }
+        res = w_set_filters_inverse_nonseparable(filter1, filter2, filter3, filter4, len);
     }
 
-    return 0;
+    return res;
 }
 
 

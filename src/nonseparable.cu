@@ -1,6 +1,16 @@
 #include "nonseparable.h"
 #include "common.h"
 
+#ifdef SEPARATE_COMPILATION
+// Required for separate compilation (see Makefile)
+#ifndef CONSTMEM_FILTERS_NS
+#define CONSTMEM_FILTERS_NS
+__constant__ DTYPE c_kern_LL[MAX_FILTER_WIDTH * MAX_FILTER_WIDTH];
+__constant__ DTYPE c_kern_LH[MAX_FILTER_WIDTH * MAX_FILTER_WIDTH];
+__constant__ DTYPE c_kern_HL[MAX_FILTER_WIDTH * MAX_FILTER_WIDTH];
+__constant__ DTYPE c_kern_HH[MAX_FILTER_WIDTH * MAX_FILTER_WIDTH];
+#endif
+#endif
 
 // outer product of arrays "a", "b" of length "len"
 DTYPE* w_outer(DTYPE* a, DTYPE* b, int len) {
@@ -70,6 +80,29 @@ int w_compute_filters(const char* wname, int direction, int do_swt) {
     cudaMemcpyToSymbol(c_kern_HH, f2_d, hlen*hlen*sizeof(DTYPE), 0, cudaMemcpyHostToDevice);
 
     return hlen;
+}
+
+
+int w_set_filters_forward_nonseparable(DTYPE* filter1, DTYPE* filter2, DTYPE* filter3, DTYPE* filter4, uint len) {
+    if (cudaMemcpyToSymbol(c_kern_LL, filter1, len*len*sizeof(DTYPE), 0, cudaMemcpyHostToDevice) != cudaSuccess
+            || cudaMemcpyToSymbol(c_kern_LH, filter2, len*len*sizeof(DTYPE), 0, cudaMemcpyHostToDevice) != cudaSuccess
+            || cudaMemcpyToSymbol(c_kern_HL, filter3, len*len*sizeof(DTYPE), 0, cudaMemcpyHostToDevice) != cudaSuccess
+            || cudaMemcpyToSymbol(c_kern_HH, filter4, len*len*sizeof(DTYPE), 0, cudaMemcpyHostToDevice) != cudaSuccess)
+    {
+        return -3;
+    }
+    return 0;
+}
+
+int w_set_filters_inverse_nonseparable(DTYPE* filter1, DTYPE* filter2, DTYPE* filter3, DTYPE* filter4, uint len) {
+    if (cudaMemcpyToSymbol(c_kern_LL, filter1, len*len*sizeof(DTYPE), 0, cudaMemcpyHostToDevice) != cudaSuccess
+        || cudaMemcpyToSymbol(c_kern_LH, filter2, len*len*sizeof(DTYPE), 0, cudaMemcpyHostToDevice) != cudaSuccess
+        || cudaMemcpyToSymbol(c_kern_HL, filter3, len*len*sizeof(DTYPE), 0, cudaMemcpyHostToDevice) != cudaSuccess
+        || cudaMemcpyToSymbol(c_kern_HH, filter4, len*len*sizeof(DTYPE), 0, cudaMemcpyHostToDevice) != cudaSuccess)
+    {
+        return -3;
+    }
+    return 0;
 }
 
 

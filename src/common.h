@@ -14,6 +14,7 @@
 
 #define MAX_FILTER_WIDTH 40
 
+#ifdef SEPARATE_COMPILATION
 extern __constant__ DTYPE c_kern_L[MAX_FILTER_WIDTH];
 extern __constant__ DTYPE c_kern_H[MAX_FILTER_WIDTH];
 extern __constant__ DTYPE c_kern_IL[MAX_FILTER_WIDTH];
@@ -23,6 +24,17 @@ extern __constant__ DTYPE c_kern_LL[MAX_FILTER_WIDTH * MAX_FILTER_WIDTH];
 extern __constant__ DTYPE c_kern_LH[MAX_FILTER_WIDTH * MAX_FILTER_WIDTH];
 extern __constant__ DTYPE c_kern_HL[MAX_FILTER_WIDTH * MAX_FILTER_WIDTH];
 extern __constant__ DTYPE c_kern_HH[MAX_FILTER_WIDTH * MAX_FILTER_WIDTH];
+#else
+__constant__ DTYPE c_kern_L[MAX_FILTER_WIDTH];
+__constant__ DTYPE c_kern_H[MAX_FILTER_WIDTH];
+__constant__ DTYPE c_kern_IL[MAX_FILTER_WIDTH];
+__constant__ DTYPE c_kern_IH[MAX_FILTER_WIDTH];
+
+__constant__ DTYPE c_kern_LL[MAX_FILTER_WIDTH * MAX_FILTER_WIDTH];
+__constant__ DTYPE c_kern_LH[MAX_FILTER_WIDTH * MAX_FILTER_WIDTH];
+__constant__ DTYPE c_kern_HL[MAX_FILTER_WIDTH * MAX_FILTER_WIDTH];
+__constant__ DTYPE c_kern_HH[MAX_FILTER_WIDTH * MAX_FILTER_WIDTH];
+#endif
 
 
 __global__ void w_kern_soft_thresh(DTYPE* c_h, DTYPE* c_v, DTYPE* c_d, DTYPE beta, int Nr, int Nc);

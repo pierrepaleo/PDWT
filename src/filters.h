@@ -40,6 +40,10 @@
 #define LIBEXPORT
 #endif
 
+// Uncomment to use separate compilation
+// mind that the "-dc" compilation flag must be used instead of "-c"
+// #define SEPARATE_COMPILATION
+
 
 LIBEXPORT DTYPE DB2_L[4];
 
