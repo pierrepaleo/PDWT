@@ -51,12 +51,13 @@ make demo
 ### Running the example
 
 To run the test, you need a raw image in 32 bits floating point precision format.
-As PDWT was primarily written for data crunching, the I/O part is not addressed : the input and output of PDWT are float (or double, if compiled accordingly with `make libpdwtd.so`) arrays.
+As PDWT was primarily written for data crunching, the I/O part is not addressed: the input and output of PDWT are float (or double, if compiled accordingly with `make libpdwtd.so`) arrays.
 
 If you have python and scipy installed, you can generate an image input file with
 
 ```bash
-python generate_lena.py [Nr] [Nc]
+cd test
+python generate_image.py [Nr] [Nc]
 ```
 where Nr, Nc are optional arguments which are the number of rows/columns of the generated image (default is 512).
 
@@ -64,7 +65,7 @@ You can then run an example with
 
 ```bash
 make demo
-./build/demo
+./demo
 ```
 
 and tune the wavelet, number of levels, etc. in the prompt.

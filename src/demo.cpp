@@ -49,10 +49,11 @@ int main(int argc, char **argv) {
 
     // Read image
     int Nr = 512, Nc = 512;
-    //~ float* img = read_dat_file_float("test/lena.dat", Nr*Nc);
-    float* img = read_dat_file_float("/home/paleo/tmp/lenagray.png.dat", Nr*Nc);
-
-    if (img == NULL) exit(1);
+    float* img = read_dat_file_float("test/image.dat", Nr*Nc);
+    if (img == NULL) {
+        puts("Error: could not load test/image.dat");
+        exit(1);
+    }
     //~ Nr = 1; // uncomment for 1D transform
     int what = 0;
     char wname[128];
