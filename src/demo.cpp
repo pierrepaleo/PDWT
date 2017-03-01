@@ -187,9 +187,7 @@ int main(int argc, char **argv) {
 
 
     // Perform forward WT with current configuration
-    float t = W.forward();
-    puts("Forward OK");
-    printf("T = %f\n", t);
+    W.forward();
 
     float* thecoeffs = (float*) calloc(Nr*Nc, sizeof(float)); // larger than needed
     int nels = W.get_coeff(thecoeffs, 0); //3*(nlevels-1)+3);

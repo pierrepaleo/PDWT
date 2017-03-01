@@ -233,19 +233,10 @@ Wavelets::~Wavelets(void) {
 }
 
 /// Method : forward
-float Wavelets::forward(void) {
-
-        // PROFILING
-    cudaEvent_t tstart, tstop;
-    cudaEventCreate(&tstart); cudaEventCreate(&tstop);
-    float elapsedTime;
-    cudaEventRecord(tstart, 0);
-    // --- PROFILING
-
-
+void Wavelets::forward(void) {
     if (state == W_CREATION_ERROR) {
         puts("Warning: forward transform not computed, as there was an error when creating the wavelets");
-        return -1;
+        return;
     }
     // TODO: handle W_FORWARD_ERROR with return codes of transforms
     if (do_cycle_spinning) {
@@ -274,16 +265,9 @@ float Wavelets::forward(void) {
         }
     }
 
-        // PROFILING
-    cudaEventRecord(tstop, 0); cudaEventSynchronize(tstop); cudaEventElapsedTime(&elapsedTime, tstart, tstop);
-    // --- PROFILING
-
     // else: not implemented yet
-
     state = W_FORWARD;
 
-        //////
-    return elapsedTime;
 }
 /// Method : inverse
 void Wavelets::inverse(void) {
@@ -323,12 +307,12 @@ void Wavelets::inverse(void) {
 }
 
 /// Method : soft thresholding (L1 proximal)
-void Wavelets::soft_threshold(DTYPE beta, int do_thresh_appcoeffs, int normalize, int threshold_cousins) {
+void Wavelets::soft_threshold(DTYPE beta, int do_thresh_appcoeffs, int normalize) {
     if (state == W_INVERSE) {
         puts("Warning: Wavelets(): cannot threshold coefficients, as they were modified by W.inverse()");
         return;
     }
-    w_call_soft_thresh(d_coeffs, beta, winfos, do_thresh_appcoeffs, normalize, threshold_cousins);
+    w_call_soft_thresh(d_coeffs, beta, winfos, do_thresh_appcoeffs, normalize);
     // TODO: handle W_THRESHOLD_ERROR from a return code
 }
 
