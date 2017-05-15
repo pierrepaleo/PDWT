@@ -326,6 +326,18 @@ void Wavelets::hard_threshold(DTYPE beta, int do_thresh_appcoeffs, int normalize
     // TODO: handle W_THRESHOLD_ERROR from a return code
 }
 
+
+/// Method : soft thresholding (L1 proximal)
+void Wavelets::group_soft_threshold(DTYPE beta, int do_thresh_appcoeffs, int normalize) {
+    if (state == W_INVERSE) {
+        puts("Warning: Wavelets(): cannot threshold coefficients, as they were modified by W.inverse()");
+        return;
+    }
+    w_call_group_soft_thresh(d_coeffs, beta, winfos, do_thresh_appcoeffs, normalize);
+    // TODO: handle W_THRESHOLD_ERROR from a return code
+}
+
+
 /// Method : shrink (L2 proximal)
 void Wavelets::shrink(DTYPE beta, int do_thresh_appcoeffs) {
     if (state == W_INVERSE) {
