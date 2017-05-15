@@ -611,8 +611,6 @@ int Wavelets::set_filters_inverse(DTYPE* filter1, DTYPE* filter2, DTYPE* filter3
  */
 int Wavelets::add_wavelet(Wavelets W, DTYPE alpha) {
 
-    printf("alpha = %f\n", alpha); // DEBUG
-
     // Various checks
     if ((winfos.nlevels != W.winfos.nlevels) || (strcasecmp(wname, W.wname))) {
         puts("ERROR: add_wavelet(): right operand is not the same transform (wname, level)");
