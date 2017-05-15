@@ -137,7 +137,65 @@ __global__ void w_kern_proj_linf_1d(DTYPE* c_d, DTYPE beta, int Nr, int Nc) {
 }
 
 
+/// group soft thresholding the detail coefficients (2D)
+/// If do_thresh_appcoeffs, the appcoeff (A) is only used at the last scale:
+///    - At any scale, c_a == NULL
+///    - At the last scale, c_a != NULL  (i.e its size is the same as c_h, c_v, c_d)
+/// Must be lanched with block size (Nc, Nr) : the size of the current coefficient vector
+__global__ void w_kern_group_soft_thresh(DTYPE* c_h, DTYPE* c_v, DTYPE* c_d, DTYPE* c_a, DTYPE beta, int Nr, int Nc, int do_thresh_appcoeffs) {
+    int gidx = threadIdx.x + blockIdx.x*blockDim.x;
+    int gidy = threadIdx.y + blockIdx.y*blockDim.y;
+    if (gidx < Nc && gidy < Nr) {
+        int tid = gidy*Nc + gidx;
+        DTYPE val_h = 0.0f, val_v = 0.0f, val_d = 0.0f, val_a = 0.0f;
+        DTYPE norm = 0, res = 0;
 
+        val_h = c_h[tid];
+        val_v = c_v[tid];
+        val_d = c_d[tid];
+        norm = val_h*val_h + val_v*val_v + val_d*val_d;
+
+        if (c_a != NULL) { // SWT
+            val_a = c_a[tid];
+            norm += val_a*val_a;
+        }
+        norm = sqrtf(norm);
+        if (norm == 0) res = 0;
+        else res = max(1 - beta/norm, 0.0);
+        c_h[tid] *= res;
+        c_v[tid] *= res;
+        c_d[tid] *= res;
+        if (c_a != NULL) c_a[tid] *= res;
+    }
+}
+
+/// group soft thresholding of the coefficients (1D)
+/// If do_thresh_appcoeffs, the appcoeff (A) is only used at the last scale:
+///    - At any scale, c_a == NULL
+///    - At the last scale, c_a != NULL  (i.e its size is the same as c_d)
+/// Must be lanched with block size (Nc, Nr) : the size of the current coefficient vector
+__global__ void w_kern_group_soft_thresh_1d(DTYPE* c_d, DTYPE* c_a, DTYPE beta, int Nr, int Nc, int do_thresh_appcoeffs) {
+    int gidx = threadIdx.x + blockIdx.x*blockDim.x;
+    int gidy = threadIdx.y + blockIdx.y*blockDim.y;
+    if (gidx < Nc && gidy < Nr) {
+        int tid = gidy*Nc + gidx;
+        DTYPE val_d = 0.0f, val_a = 0.0f;
+        DTYPE norm = 0, res = 0;
+
+        val_d = c_d[tid];
+        norm = val_d*val_d; // does not make much sense to use DWT_1D + group_soft_thresh  (use soft_tresh)
+
+        if (c_a != NULL) { // SWT
+            val_a = c_a[tid];
+            norm += val_a*val_a;
+        }
+        norm = sqrtf(norm);
+        if (norm == 0) res = 0;
+        else res = max(1 - beta/norm, 0.0);
+        c_d[tid] *= res;
+        if (c_a != NULL) c_a[tid] *= res;
+    }
+}
 
 
 /// Circular shift of the image (2D and 1D)
@@ -248,6 +306,40 @@ void w_call_proj_linf(DTYPE** d_coeffs, DTYPE beta, w_info winfos, int do_thresh
         else w_kern_proj_linf_1d<<<n_blocks, n_threads_per_block>>>(d_coeffs[i+1], beta, Nr, Nc);
     }
 }
+
+
+void w_call_group_soft_thresh(DTYPE** d_coeffs, DTYPE beta, w_info winfos, int do_thresh_appcoeffs, int normalize) {
+    int tpb = 16; // Threads per block
+    dim3 n_threads_per_block = dim3(tpb, tpb, 1);
+    dim3 n_blocks;
+    int Nr = winfos.Nr, Nc = winfos.Nc, do_swt = winfos.do_swt, nlevels = winfos.nlevels, ndims = winfos.ndims;
+    int Nr2 = Nr, Nc2 = Nc;
+    if (!do_swt) {
+        if (ndims > 1) w_div2(&Nr2);
+        w_div2(&Nc2);
+    }
+    //~ if (do_thresh_appcoeffs) {
+        //~ DTYPE beta2 = beta;
+        //~ if (normalize > 0) { // beta2 = beta/sqrt(2)^nlevels
+            //~ int nlevels2 = nlevels/2;
+            //~ beta2 /= (1 << nlevels2);
+            //~ if (nlevels2 *2 != nlevels) beta2 /= SQRT_2;
+        //~ }
+        //~ n_blocks = dim3(w_iDivUp(Nc2, tpb), w_iDivUp(Nr2, tpb), 1);
+        //~ w_kern_soft_thresh_appcoeffs<<<n_blocks, n_threads_per_block>>>(d_coeffs[0], beta2, Nr2, Nc2);
+    //~ }
+    for (int i = 0; i < nlevels; i++) {
+        if (!do_swt) {
+            if (ndims > 1) w_div2(&Nr);
+            w_div2(&Nc);
+        }
+        if (normalize > 0) beta /= SQRT_2;
+        n_blocks = dim3(w_iDivUp(Nc, tpb), w_iDivUp(Nr, tpb), 1);
+        if (ndims > 1) w_kern_group_soft_thresh<<<n_blocks, n_threads_per_block>>>(d_coeffs[3*i+1], d_coeffs[3*i+2], d_coeffs[3*i+3], ((do_thresh_appcoeffs && i == nlevels-1) ? d_coeffs[0]: NULL), beta, Nr, Nc, do_thresh_appcoeffs);
+        else w_kern_group_soft_thresh_1d<<<n_blocks, n_threads_per_block>>>(d_coeffs[i+1], ((do_thresh_appcoeffs && i == nlevels-1) ? d_coeffs[0]: NULL), beta, Nr, Nc, do_thresh_appcoeffs);
+    }
+}
+
 
 
 

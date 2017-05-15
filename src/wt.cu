@@ -156,7 +156,7 @@ Wavelets::Wavelets(
     int N;
     if (ndim == 2) N = min(Nr, Nc);
     else N = Nc;
-    int wmaxlev = w_ilog2(N/hlen);
+    int wmaxlev = w_ilog2(N/(hlen-1));
     // TODO: remove this limitation
     if (levels > wmaxlev) {
         printf("Warning: required level (%d) is greater than the maximum possible level for %s (%d) on a %dx%d image.\n", winfos.nlevels, wname, wmaxlev, winfos.Nc, winfos.Nr);

@@ -41,4 +41,4 @@ libpdwtd.so: $(PDWTCORE)
 
 
 clean:
-	rm -rf build
+	rm -rf build demo libpdwt*.so

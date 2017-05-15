@@ -6,9 +6,9 @@ TODO LIST
 - Modify inverse haar (and related) to avoid extra memcpy
 - Nonseparable SWT re-computes the inverse filters at each inversion (for memory requirements). See if there is a workaround.
 - Update filters coefficients in filters.cpp, to be compatible with PyWavelets.
-- ISWT:
+- SWT:
     - Either return all app coeffs (can be interesing for multi-resolution)
-    - Or only store appcoeffs at last scale (for eg. Matlab only uses the last appcoeff for iswt)
+    - Or only store appcoeffs at last scale (for eg. Matlab only uses the last appcoeff for iswt). This is what is done by default.
 - Exceptions to fail gracefully (especially from the Python side)
 - More threshold types
 - Compute norm related to threshold (eg. soft/L1, group-lasso, etc)
