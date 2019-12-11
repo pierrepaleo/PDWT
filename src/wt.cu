@@ -656,15 +656,14 @@ int Wavelets::add_wavelet(Wavelets W, DTYPE alpha) {
     return 0;
 }
 
+/// Return the memory pointer (unsigned int64) of the device image
+__intptr_t Wavelets::image_int_ptr(void) {
+    return (__intptr_t) d_image;
+}
 
-
-
-
-
-
-
-
-
-
+/// Return the memory pointer (unsigned int64) of the device coefficient.
+__intptr_t Wavelets::coeff_int_ptr(int num) {
+    return (__intptr_t) d_coeffs[num];
+}
 
 
