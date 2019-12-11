@@ -1,5 +1,8 @@
 CHANGELOG
 
+Version 0.7.1 (11/12/2019)
+- Add image_int_ptr and coeff_int_ptr to retrieve memory pointers as integers
+
 Version 0.7 (22/11/2016)
 - Transforms (including SWT) and their inverses now support odd-sized input data.
 
