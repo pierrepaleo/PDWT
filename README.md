@@ -1,3 +1,6 @@
+[![DOI](https://zenodo.org/badge/52112351.svg)](https://zenodo.org/badge/latestdoi/52112351)
+
+
 ## Parallel DWT
 
 PDWT is a parallel implementation of the Discrete Wavelet Transform (DWT).
@@ -99,5 +102,12 @@ printf("After threshold : L1 = %e\n", norm1);
 W.inverse();
 W.get_image(img);
 ```
+
+## Citing
+
+If you use this software, you can cite it through the following Zenodo DOI:
+
+
+[![DOI](https://zenodo.org/badge/52112351.svg)](https://zenodo.org/badge/latestdoi/52112351)
 
 
